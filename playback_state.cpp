@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "resource.h"
 
-void StartOutput();
+void ToggleOutput();	// foo_ws2812.cpp
 
 class CPlaybackStateDemo : public CDialogImpl<CPlaybackStateDemo>, private play_callback_impl_base {
 public:
@@ -18,6 +18,7 @@ public:
 		COMMAND_HANDLER_EX(IDC_NEXT, BN_CLICKED, OnNextClicked)
 		COMMAND_HANDLER_EX(IDC_RAND, BN_CLICKED, OnRandClicked)
 		MSG_WM_CONTEXTMENU(OnContextMenu)
+		COMMAND_HANDLER(IDC_OUTPUT, BN_CLICKED, OnBnClickedOutput)
 	END_MSG_MAP()
 private:
 
@@ -40,7 +41,7 @@ private:
 
 	void OnPlayClicked(UINT, int, CWindow) {m_playback_control->start();}
 	void OnStopClicked(UINT, int, CWindow) {m_playback_control->stop();}
-	void OnPauseClicked(UINT, int, CWindow) {/*m_playback_control->toggle_pause();*/ StartOutput();}
+	void OnPauseClicked(UINT, int, CWindow) {m_playback_control->toggle_pause();}
 	void OnPrevClicked(UINT, int, CWindow) {m_playback_control->start(playback_control::track_command_prev);}
 	void OnNextClicked(UINT, int, CWindow) {m_playback_control->start(playback_control::track_command_next);}
 	void OnRandClicked(UINT, int, CWindow) {m_playback_control->start(playback_control::track_command_rand);}
@@ -52,6 +53,8 @@ private:
 	titleformat_object::ptr m_script;
 
 	static_api_ptr_t<playback_control> m_playback_control;
+public:
+	LRESULT OnBnClickedOutput(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/);
 };
 
 void CPlaybackStateDemo::OnCancel(UINT, int, CWindow) {
@@ -152,4 +155,12 @@ void RunPlaybackStateDemo() {
 	} catch(std::exception const & e) {
 		popup_message::g_complain("Dialog creation failure", e);
 	}
+}
+
+
+LRESULT CPlaybackStateDemo::OnBnClickedOutput(WORD /*wNotifyCode*/, WORD /*wID*/, HWND /*hWndCtl*/, BOOL& /*bHandled*/)
+{
+	// TODO: Add your control notification handler code here
+	ToggleOutput();
+	return 0;
 }

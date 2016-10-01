@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -32,9 +29,6 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\foo_sample\PCH.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="initquit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -47,9 +41,15 @@
     <ClCompile Include="mainmenu.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="PCH.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="..\foo_sample\foo_ws2812.rc">
+    <None Include="Readme" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="foo_ws2812.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>

@@ -445,67 +445,20 @@ void OutputSpectrumBars(const audio_sample *psample, int samples, audio_sample p
 //		buffer[i] = 0;
 }
 
-void StartOutput()
+void ToggleOutput()
 {
-	try {
+//	try {
 		if (ws2812_init_done) {
-#if 0
-			double	abstime;
-
-			// get current track time
-			if (ws2812_stream->get_absolute_time(abstime)) {
-				audio_chunk_fast_impl	chunk;
-
-				// FFT data
-				if (ws2812_stream->get_spectrum_absolute(chunk, abstime, 16 * 1024)) {
-					// number of channels, should be 1
-				//	int channels = chunk.get_channel_count();
-					// number of samples in the chunk, fft_size / 2
-					int samples = chunk.get_sample_count();
-					// peak sample value
-					audio_sample peak = chunk.get_peak();
-
-					// 240 LEDs, RGB for each, plus one start byte
-					unsigned char buffer[1 + 3 * ws2812_rows * ws2812_columns];
-
-					// convert samples
-					const audio_sample *psample = chunk.get_data();
-					if (psample != nullptr && samples > 0) {
-
-						// a value of 1 is used as start byte
-						// and must not occur in other bytes in the buffer
-						buffer[0] = 1;
-
-						if (0) {
-							OutputTest(psample, samples, peak, &buffer[1], sizeof(buffer) - 1);
-						} else {
-							OutputSpectrumBars(psample, samples, peak, &buffer[1], ws2812_rows, ws2812_columns);
-						}
-
-						// open the port
-					//	if (OpenPort(ws2812_port_str)) {
-							// send buffer
-							WriteABuffer(buffer, sizeof buffer);
-							// close the port
-					//		ClosePort();
-					//	}
-					}
-				}
-				else {
-					// playback hasn't started yet...
-				}
-			}
-#else
+			// toggle timer state
 			if (ws2812_timerStarted == false)
 				StartTimer();
 			else
 				StopTimer();
-#endif
 		}
-	}
-	catch (std::exception const & e) {
-		popup_message::g_complain("WS2812 Output exception", e);
-	}
+//	}
+//	catch (std::exception const & e) {
+//		popup_message::g_complain("WS2812 Output exception", e);
+//	}
 }
 
 
