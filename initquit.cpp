@@ -2,8 +2,7 @@
 
 // Sample initquit implementation. See also: initquit class documentation in relevant header.
 
-void InitOutput();
-void DeinitOutput();
+#include "foo_ws2812.h"
 
 
 class myinitquit : public initquit {
