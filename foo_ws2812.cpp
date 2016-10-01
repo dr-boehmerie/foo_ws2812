@@ -120,24 +120,24 @@ BOOL WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
 		else {
 			// Write is pending.
 			dwRes = WaitForSingleObject(osWrite.hEvent, INFINITE);
-		}
-		switch (dwRes)
-		{
-			// OVERLAPPED structure's event has been signaled. 
-		case WAIT_OBJECT_0:
-			if (!GetOverlappedResult(ws2812_hComm, &osWrite, &dwWritten, FALSE))
-				fRes = FALSE;
-			else
-				// Write operation completed successfully.
-				fRes = TRUE;
-			break;
+			switch (dwRes)
+			{
+				// OVERLAPPED structure's event has been signaled. 
+			case WAIT_OBJECT_0:
+				if (!GetOverlappedResult(ws2812_hComm, &osWrite, &dwWritten, FALSE))
+					fRes = FALSE;
+				else
+					// Write operation completed successfully.
+					fRes = TRUE;
+				break;
 
-		default:
-			// An error has occurred in WaitForSingleObject.
-			// This usually indicates a problem with the
-			// OVERLAPPED structure's event handle.
-			fRes = FALSE;
-			break;
+			default:
+				// An error has occurred in WaitForSingleObject.
+				// This usually indicates a problem with the
+				// OVERLAPPED structure's event handle.
+				fRes = FALSE;
+				break;
+			}
 		}
 	} else {
 		// WriteFile completed immediately.
