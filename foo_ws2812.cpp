@@ -6,11 +6,15 @@
 
 service_ptr_t<visualisation_stream_v3> ws2812_stream;
 
-HANDLE ws2812_hComm = INVALID_HANDLE_VALUE;
-HANDLE ws2812_hTimer = INVALID_HANDLE_VALUE;
+HANDLE	ws2812_hComm = INVALID_HANDLE_VALUE;
+HANDLE	ws2812_hTimer = INVALID_HANDLE_VALUE;
+
+DWORD	ws2812_commErr;
 
 LPCWSTR const	ws2812_port_str = L"COM7";
 unsigned int	ws2812_comPort = 7;
+
+unsigned int	ws2812_fft_size = 4 * 1024;
 
 bool		ws2812_init_done = false;
 
@@ -36,8 +40,9 @@ unsigned char	*ws2812_persistenceBuffer = nullptr;
 
 
 void OutputTest(const audio_sample *psample, int samples, audio_sample peak, unsigned char *buffer, int bufferSize);
-void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer, unsigned int rows, unsigned int cols);
+void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer, unsigned int rows, unsigned int cols);
 
+void CalcAndOutput(void);
 
 // COM port handling taken from the MSDN
 BOOL OpenPort(LPCWSTR gszPort, unsigned int port)
@@ -58,12 +63,13 @@ BOOL OpenPort(LPCWSTR gszPort, unsigned int port)
 	}
 	if (ws2812_hComm == INVALID_HANDLE_VALUE) {
 		// error opening port; abort
+		ws2812_commErr = GetLastError();
 		return false;
 	}
 
 	DCB dcb;
 
-	FillMemory(&dcb, sizeof(dcb), 0);
+	ZeroMemory(&dcb, sizeof(dcb));
 
 	// get current DCB
 	if (GetCommState(ws2812_hComm, &dcb)) {
@@ -113,7 +119,8 @@ BOOL WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
 
 	// Issue write.
 	if (!WriteFile(ws2812_hComm, lpBuf, dwToWrite, &dwWritten, &osWrite)) {
-		if (GetLastError() != ERROR_IO_PENDING) {
+		ws2812_commErr = GetLastError();
+		if (ws2812_commErr != ERROR_IO_PENDING) {
 			// WriteFile failed, but isn't delayed. Report error and abort.
 			fRes = FALSE;
 		}
@@ -150,45 +157,7 @@ BOOL WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
 
 VOID CALLBACK WaitOrTimerCallback(PVOID lpParameter, BOOLEAN TimerOrWaitFired)
 {
-	double	abs_time;
-
-	// get current track time
-	if (ws2812_stream->get_absolute_time(abs_time)) {
-		audio_chunk_fast_impl	chunk;
-		unsigned int			fft_size = 16 * 1024;
-
-		// FFT data
-		if (ws2812_stream->get_spectrum_absolute(chunk, abs_time, fft_size)) {
-			// number of channels, should be 1
-			unsigned int channels = chunk.get_channel_count();
-			// number of samples in the chunk, fft_size / 2
-			int samples = chunk.get_sample_count();
-			unsigned int sample_rate = chunk.get_sample_rate();
-			// peak sample value
-			audio_sample peak = chunk.get_peak();
-
-			// convert samples
-			const audio_sample *psample = chunk.get_data();
-			if (ws2812_outputBuffer != nullptr && psample != nullptr && samples > 0) {
-
-				// a value of 1 is used as start byte
-				// and must not occur in other bytes in the buffer
-				ws2812_outputBuffer[0] = 1;
-
-				OutputSpectrumBars(psample, samples, peak, &ws2812_outputBuffer[1], ws2812_rows, ws2812_columns);
-
-				// send buffer
-				WriteABuffer(ws2812_outputBuffer, ws2812_bufferSize);
-
-			} else {
-				// no samples ?
-			}
-		} else {
-			// no FFT data ?
-		}
-	} else {
-		// playback hasn't started yet...
-	}
+	CalcAndOutput();
 }
 
 bool StartTimer()
@@ -269,8 +238,8 @@ void InitOutput()
 		ws2812_persistenceBuffer = new unsigned char[ws2812_bufferSize];
 
 		if (ws2812_outputBuffer && ws2812_persistenceBuffer) {
-			memset(ws2812_outputBuffer, 0, ws2812_bufferSize);
-			memset(ws2812_persistenceBuffer, 0, ws2812_bufferSize);
+			ZeroMemory(ws2812_outputBuffer, ws2812_bufferSize);
+			ZeroMemory(ws2812_persistenceBuffer, ws2812_bufferSize);
 
 			ws2812_init_done = true;
 		}
@@ -551,7 +520,7 @@ void LedToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int &r,
 	buffer[3 * led_index + 2] = (unsigned char)b;
 }
 
-void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer, unsigned int rows, unsigned int cols)
+void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer, unsigned int rows, unsigned int cols)
 {
 	unsigned int	bar, cnt, row;
 	unsigned int	bar_cnt;
@@ -568,6 +537,7 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 	audio_sample	db_max;
 	audio_sample	db_min;
 	double			log_mult;
+	double			bar_freq;
 
 	// vertical bars
 	bar_cnt = cols;
@@ -588,10 +558,18 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 	// fixed peak value
 	peak = (audio_sample)(1.0 * samples_per_bar);
 
-	sample_index = 0;
 
-	log_mult = log10(samples);
-	log_mult /= (double)bar_cnt;
+	// first bar includes samples up to 50 Hz
+	bar_freq = 50;
+
+//	log_mult = log10(samples);
+//	log_mult /= (double)bar_cnt;
+	log_mult = delta_f * (audio_sample)samples;
+	log_mult /= bar_freq;
+	// nth root of max_freq/min_freq, where n is the count of bars
+	log_mult = pow(log_mult, 1.0 / bar_cnt);
+
+	sample_index = 0;
 
 	for (bar = 0; bar < bar_cnt; bar++) {
 		if (ws2812_logFrequency == false) {
@@ -648,16 +626,28 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 		else {
 			// logarithmic frequency scaling
 			// number of samples per bar depends on bar index
-
+		//	if (bar == 0) {
+		//		// first bar -> everthing up to 50 Hz
+		//		samples_per_bar = (unsigned int)(50 / delta_f);
+		//		if (samples_per_bar < 1)
+		//			samples_per_bar = 1;
+		//	}
+		//	else
 			if (bar == (bar_cnt - 1)) {
 				// last bar -> remaining samples
-				samples_per_bar = samples - sample_index;
+				if (samples > sample_index)
+					samples_per_bar = samples - sample_index;
+				else
+					samples_per_bar = 0;
 			}
 			else {
 				double	tmp;
 
-				tmp = log_mult * (double)(bar + 1);
-				tmp = pow(10, tmp);
+				// calc start sample index of the following bar
+			//	tmp = log_mult * (double)(bar + 1);
+			//	tmp = pow(10, tmp);
+			//	tmp = 50 * pow(log_mult, bar) / delta_f;
+				tmp = ceil(bar_freq / delta_f);
 
 				// count of samples to the next index
 				if (tmp <= (double)sample_index)
@@ -666,8 +656,8 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 					samples_per_bar = (unsigned int)tmp - sample_index;
 
 				// minimum sample count (trial and error, should depend somehow on the max fft frequency...)
-				if (samples_per_bar < 5)
-					samples_per_bar = 5;
+				if (samples_per_bar < 1)
+					samples_per_bar = 1;
 
 				// prevent index overflow
 				if (sample_index >= samples)
@@ -714,6 +704,8 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 			}
 			sample_index += samples_per_bar;
 		}
+		// increase max frequency for the next bar
+		bar_freq *= log_mult;
 
 		// calc height of bar in rows
 		// 0 db is max, -10 * (rows - 1) is min
@@ -784,7 +776,77 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 //		buffer[i] = 0;
 }
 
-void ToggleOutput(void)
+void CalcAndOutput(void)
+{
+	double	abs_time;
+
+	// get current track time
+	if (ws2812_stream->get_absolute_time(abs_time)) {
+		audio_chunk_fast_impl	chunk;
+		unsigned int			fft_size = ws2812_fft_size;
+
+		// FFT data
+		if (ws2812_stream->get_spectrum_absolute(chunk, abs_time, fft_size)) {
+			// number of channels, should be 1
+			unsigned int	channels = chunk.get_channel_count();
+			// number of samples in the chunk, fft_size / 2
+			int				samples = chunk.get_sample_count();
+			unsigned int	sample_rate = chunk.get_sample_rate();
+			// peak sample value
+			audio_sample	peak = 1.0;	// chunk.get_peak();
+			audio_sample	delta_f = (audio_sample)sample_rate / (audio_sample)fft_size;
+
+			// convert samples
+			const audio_sample *psample = chunk.get_data();
+			if (ws2812_outputBuffer != nullptr && psample != nullptr && samples > 0) {
+
+				// a value of 1 is used as start byte
+				// and must not occur in other bytes in the buffer
+				ws2812_outputBuffer[0] = 1;
+
+				OutputSpectrumBars(psample, samples, peak, delta_f, &ws2812_outputBuffer[1], ws2812_rows, ws2812_columns);
+
+				// send buffer
+				WriteABuffer(ws2812_outputBuffer, ws2812_bufferSize);
+
+			}
+			else {
+				// no samples ?
+			}
+		}
+		else {
+			// no FFT data ?
+		}
+	}
+	else {
+		// playback hasn't started yet...
+	}
+}
+
+bool StopOutput(void)
+{
+	bool	isRunning = false;
+
+	if (ws2812_init_done && ws2812_timerStarted) {
+		isRunning = true;
+
+		StopTimer();
+		ClosePort();
+	}
+	return isRunning;
+}
+
+bool StartOutput(void)
+{
+	if (ws2812_init_done && ws2812_timerStarted == false) {
+		if (OpenPort(NULL, ws2812_comPort)) {
+			StartTimer();
+		}
+	}
+	return ws2812_timerStarted;
+}
+
+bool ToggleOutput(void)
 {
 //	try {
 		if (ws2812_init_done) {
@@ -804,6 +866,8 @@ void ToggleOutput(void)
 //	catch (std::exception const & e) {
 //		popup_message::g_complain("WS2812 Output exception", e);
 //	}
+
+	return ws2812_timerStarted;
 }
 
 
@@ -811,7 +875,7 @@ void ConfigMatrix(int rows, int cols, int start_led, int led_dir)
 {
 	bool	timerRunning;
 
-	if (rows > 0 && rows < 30 && cols > 0 && cols < 30) {
+	if (rows > 0 && rows <= 32 && cols > 0 && cols <= 32) {
 		ws2812_rows = rows;
 		ws2812_columns = cols;
 
@@ -834,8 +898,8 @@ void ConfigMatrix(int rows, int cols, int start_led, int led_dir)
 		ws2812_persistenceBuffer = new unsigned char[ws2812_bufferSize];
 
 		if (ws2812_outputBuffer && ws2812_persistenceBuffer) {
-			memset(ws2812_outputBuffer, 0, ws2812_bufferSize);
-			memset(ws2812_persistenceBuffer, 0, ws2812_bufferSize);
+			ZeroMemory(ws2812_outputBuffer, ws2812_bufferSize);
+			ZeroMemory(ws2812_persistenceBuffer, ws2812_bufferSize);
 
 			ws2812_init_done = true;
 

@@ -28,6 +28,7 @@
 #define IDC_LED_DIR                     1016
 #define IDC_LOG_AMPL                    1017
 #define IDC_PEAK_VALS                   1018
+#define IDC_START_LED2                  1019
 
 // Next default values for new objects
 // 

@@ -5,6 +5,7 @@
 
 #include "foo_ws2812.h"
 
+#define CALC_TAB_ELEMENTS(_TAB_)	(sizeof(_TAB_)/sizeof(_TAB_[0]))
 
 // These GUIDs identify the variables within our component's configuration file.
 // {FDCD346D-3B1B-413C-9CAE-3A221AA6993B}
@@ -56,6 +57,15 @@ enum {
 	default_cfg_bogoSetting3 = 42,
 };
 
+LPCTSTR		cfg_startLedStr[4] = { L"Top Left", L"Top Right", L"Bottom Left", L"Bottom Right" };
+LRESULT		cfg_startLedId[4];
+
+LPCTSTR		cfg_ledDirStr[2] = { L"Common", L"Alternating" };
+LRESULT		cfg_ledDirId[2];
+
+LPCTSTR		cfg_lineStyleStr[3] = { L"Simple", L"Green/Red", L"Fire" };
+LRESULT		cfg_lineStyleId[3];
+
 static cfg_uint cfg_matrixRows(guid_cfg_matrixRows, default_cfg_matrixRows);
 static cfg_uint cfg_matrixCols(guid_cfg_matrixCols, default_cfg_matrixCols);
 static cfg_uint cfg_brightness(guid_cfg_brightness, default_cfg_brightness);
@@ -76,7 +86,8 @@ static advconfig_integer_factory cfg_bogoSetting3("Bogo setting 3", guid_cfg_bog
 class CMyPreferences : public CDialogImpl<CMyPreferences>, public preferences_page_instance {
 public:
 	//Constructor - invoked by preferences_page_impl helpers - don't do Create() in here, preferences_page_impl does this for us
-	CMyPreferences(preferences_page_callback::ptr callback) : m_callback(callback) {}
+	CMyPreferences(preferences_page_callback::ptr callback) : m_callback(callback)
+	{}
 
 	//Note that we don't bother doing anything regarding destruction of our class.
 	//The host ensures that our dialog is destroyed first, then the last reference to our preferences_page_instance object is released, causing our object to be deleted.
@@ -97,9 +108,9 @@ public:
 		COMMAND_HANDLER_EX(IDC_BRIGHTNESS, EN_CHANGE, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_UPDATE_INTERVAL, EN_CHANGE, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_COM_PORT, EN_CHANGE, OnEditChange)
-		COMMAND_HANDLER_EX(IDC_START_LED, EN_CHANGE, OnEditChange)
-		COMMAND_HANDLER_EX(IDC_LED_DIR, EN_CHANGE, OnEditChange)
-		COMMAND_HANDLER_EX(IDC_LINE_STYLE, EN_CHANGE, OnEditChange)
+		COMMAND_HANDLER_EX(IDC_START_LED, CBN_SELCHANGE, OnCBChange)
+		COMMAND_HANDLER_EX(IDC_LED_DIR, CBN_SELCHANGE, OnCBChange)
+		COMMAND_HANDLER_EX(IDC_LINE_STYLE, CBN_SELCHANGE, OnCBChange)
 		COMMAND_HANDLER_EX(IDC_LOG_FREQ, BN_CLICKED, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_LOG_AMPL, BN_CLICKED, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_PEAK_VALS, BN_CLICKED, OnEditChange)
@@ -107,10 +118,14 @@ public:
 private:
 	BOOL OnInitDialog(CWindow, LPARAM);
 	void OnEditChange(UINT, int, CWindow);
+	void OnCBChange(UINT, int, CWindow);
 	bool HasChanged();
 	void OnChanged();
 
 	const preferences_page_callback::ptr m_callback;
+
+	bool cbChanged;
+
 };
 
 BOOL CMyPreferences::OnInitDialog(CWindow, LPARAM) {
@@ -122,19 +137,47 @@ BOOL CMyPreferences::OnInitDialog(CWindow, LPARAM) {
 //	SetDlgItemInt(IDC_START_LED, cfg_startLed, FALSE);
 //	SetDlgItemInt(IDC_LED_DIR, cfg_ledDirection, FALSE);
 
-	SetDlgItemInt(IDC_LINE_STYLE, cfg_lineStyle, FALSE);
-//	SetDlgItemInt(IDC_LOG_FREQ, cfg_logFrequency, FALSE);
-//	SetDlgItemInt(IDC_LOG_AMPL, cfg_logAmplitude, FALSE);
-//	SetDlgItemInt(IDC_PEAK_VALS, cfg_peakValues, FALSE);
+//	SetDlgItemInt(IDC_LINE_STYLE, cfg_lineStyle, FALSE);
 	CheckDlgButton(IDC_LOG_FREQ, cfg_logFrequency);
 	CheckDlgButton(IDC_LOG_AMPL, cfg_logAmplitude);
 	CheckDlgButton(IDC_PEAK_VALS, cfg_peakValues);
+
+	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_startLedId); n++) {
+		WCHAR	str[64];
+
+		StrCpy(str, cfg_startLedStr[n]);
+		cfg_startLedId[n] = SendDlgItemMessage(IDC_START_LED, CB_ADDSTRING, 0, (DWORD)str);
+	}
+	SendDlgItemMessage(IDC_START_LED, CB_SETCURSEL, cfg_startLedId[cfg_startLed], 0);
+
+	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_ledDirId); n++) {
+		WCHAR	str[64];
+
+		StrCpy(str, cfg_ledDirStr[n]);
+		cfg_ledDirId[n] = SendDlgItemMessage(IDC_LED_DIR, CB_ADDSTRING, 0, (DWORD)str);
+	}
+	SendDlgItemMessage(IDC_LED_DIR, CB_SETCURSEL, cfg_ledDirId[cfg_ledDirection], 0);
+
+	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_lineStyleId); n++) {
+		WCHAR	str[64];
+
+		StrCpy(str, cfg_lineStyleStr[n]);
+		cfg_lineStyleId[n] = SendDlgItemMessage(IDC_LINE_STYLE, CB_ADDSTRING, 0, (DWORD)str);
+	}
+	SendDlgItemMessage(IDC_LINE_STYLE, CB_SETCURSEL, cfg_lineStyleId[cfg_lineStyle], 0);
+
+	cbChanged = false;
 
 	return FALSE;
 }
 
 void CMyPreferences::OnEditChange(UINT, int, CWindow) {
 	// not much to do here
+	OnChanged();
+}
+
+void CMyPreferences::OnCBChange(UINT, int, CWindow) {
+	cbChanged = true;
 	OnChanged();
 }
 
@@ -153,36 +196,66 @@ void CMyPreferences::reset() {
 //	SetDlgItemInt(IDC_START_LED, default_cfg_startLed, FALSE);
 //	SetDlgItemInt(IDC_LED_DIR, default_cfg_ledDirection, FALSE);
 
-	SetDlgItemInt(IDC_LINE_STYLE, default_cfg_lineStyle, FALSE);
-//	SetDlgItemInt(IDC_LOG_FREQ, default_cfg_logFrequency, FALSE);
-//	SetDlgItemInt(IDC_LOG_AMPL, default_cfg_logAmplitude, FALSE);
-//	SetDlgItemInt(IDC_PEAK_VALS, default_cfg_peakValues, FALSE);
+//	SetDlgItemInt(IDC_LINE_STYLE, default_cfg_lineStyle, FALSE);
 	CheckDlgButton(IDC_LOG_FREQ, default_cfg_logFrequency);
 	CheckDlgButton(IDC_LOG_AMPL, default_cfg_logAmplitude);
 	CheckDlgButton(IDC_PEAK_VALS, default_cfg_peakValues);
+
+	SendDlgItemMessage(IDC_START_LED, CB_SETCURSEL, cfg_startLedId[default_cfg_startLed], 0);
+	SendDlgItemMessage(IDC_LED_DIR, CB_SETCURSEL, cfg_startLedId[default_cfg_ledDirection], 0);
+	SendDlgItemMessage(IDC_LINE_STYLE, CB_SETCURSEL, cfg_startLedId[default_cfg_lineStyle], 0);
+	cbChanged = true;
 
 	OnChanged();
 }
 
 void CMyPreferences::apply() {
+	bool	isActive;
+	LRESULT	r;
+
 	// Min/Max ???
 	cfg_matrixRows = GetDlgItemInt(IDC_MATRIX_ROWS, NULL, FALSE);
 	cfg_matrixCols = GetDlgItemInt(IDC_MATRIX_COLS, NULL, FALSE);
 	cfg_brightness = GetDlgItemInt(IDC_BRIGHTNESS, NULL, FALSE);
 	cfg_updateInterval = GetDlgItemInt(IDC_UPDATE_INTERVAL, NULL, FALSE);
 	cfg_comPort = GetDlgItemInt(IDC_COM_PORT, NULL, FALSE);
-	cfg_startLed = GetDlgItemInt(IDC_START_LED, NULL, FALSE);
-	cfg_ledDirection = GetDlgItemInt(IDC_LED_DIR, NULL, FALSE);
+//	cfg_startLed = GetDlgItemInt(IDC_START_LED, NULL, FALSE);
+//	cfg_ledDirection = GetDlgItemInt(IDC_LED_DIR, NULL, FALSE);
 
-	cfg_lineStyle = GetDlgItemInt(IDC_LINE_STYLE, NULL, FALSE);
-//	cfg_logFrequency = GetDlgItemInt(IDC_LOG_FREQ, NULL, FALSE);
-//	cfg_logAmplitude = GetDlgItemInt(IDC_LOG_AMPL, NULL, FALSE);
-//	cfg_peakValues = GetDlgItemInt(IDC_PEAK_VALS, NULL, FALSE);
-//	GetDlgItem(IDC_PEAK_VALS).IsDlgButtonChecked
+//	cfg_lineStyle = GetDlgItemInt(IDC_LINE_STYLE, NULL, FALSE);
 	cfg_logFrequency = IsDlgButtonChecked(IDC_LOG_FREQ);
 	cfg_logAmplitude = IsDlgButtonChecked(IDC_LOG_AMPL);
 	cfg_peakValues = IsDlgButtonChecked(IDC_PEAK_VALS);
 
+	r = SendDlgItemMessage(IDC_START_LED, CB_GETCURSEL, 0, 0);
+	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_startLedId); n++) {
+		if (r == cfg_startLedId[n]) {
+			cfg_startLed = n;
+			break;
+		}
+	}
+	r = SendDlgItemMessage(IDC_LED_DIR, CB_GETCURSEL, 0, 0);
+	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_ledDirId); n++) {
+		if (r == cfg_ledDirId[n]) {
+			cfg_ledDirection = n;
+			break;
+		}
+	}
+	r = SendDlgItemMessage(IDC_LINE_STYLE, CB_GETCURSEL, 0, 0);
+	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_lineStyleId); n++) {
+		if (r == cfg_lineStyleId[n]) {
+			cfg_lineStyle = n;
+			break;
+		}
+	}
+
+	cbChanged = false;
+
+
+	// stop output
+	isActive = StopOutput();
+
+	// write configuration values into the driver
 	ConfigMatrix(cfg_matrixRows, cfg_matrixCols, cfg_startLed, cfg_ledDirection);
 	SetBrightness(cfg_brightness);
 	SetInterval(cfg_updateInterval);
@@ -190,6 +263,10 @@ void CMyPreferences::apply() {
 
 	SetLineStyle(cfg_lineStyle);
 	SetScaling(cfg_logFrequency, cfg_logAmplitude, cfg_peakValues);
+
+	// restart the output
+	if (isActive)
+		StartOutput();
 
 	OnChanged(); //our dialog content has not changed but the flags have - our currently shown values now match the settings so the apply button can be disabled
 }
@@ -203,16 +280,15 @@ bool CMyPreferences::HasChanged() {
 	changed |= GetDlgItemInt(IDC_BRIGHTNESS, NULL, FALSE) != cfg_brightness;
 	changed |= GetDlgItemInt(IDC_UPDATE_INTERVAL, NULL, FALSE) != cfg_updateInterval;
 	changed |= GetDlgItemInt(IDC_COM_PORT, NULL, FALSE) != cfg_comPort;
-	changed |= GetDlgItemInt(IDC_START_LED, NULL, FALSE) != cfg_startLed;
-	changed |= GetDlgItemInt(IDC_LED_DIR, NULL, FALSE) != cfg_ledDirection;
+//	changed |= GetDlgItemInt(IDC_START_LED, NULL, FALSE) != cfg_startLed;
+//	changed |= GetDlgItemInt(IDC_LED_DIR, NULL, FALSE) != cfg_ledDirection;
 
-	changed |= GetDlgItemInt(IDC_LINE_STYLE, NULL, FALSE) != cfg_lineStyle;
-//	changed |= GetDlgItemInt(IDC_LOG_FREQ, NULL, FALSE) != cfg_logFrequency;
-//	changed |= GetDlgItemInt(IDC_LOG_AMPL, NULL, FALSE) != cfg_logAmplitude;
-//	changed |= GetDlgItemInt(IDC_PEAK_VALS, NULL, FALSE) != cfg_peakValues;
+//	changed |= GetDlgItemInt(IDC_LINE_STYLE, NULL, FALSE) != cfg_lineStyle;
 	changed |= IsDlgButtonChecked(IDC_LOG_FREQ) != cfg_logFrequency;
 	changed |= IsDlgButtonChecked(IDC_LOG_AMPL) != cfg_logAmplitude;
 	changed |= IsDlgButtonChecked(IDC_PEAK_VALS) != cfg_peakValues;
+
+	changed |= cbChanged;
 
 	return changed;
 }
@@ -261,6 +337,16 @@ unsigned int GetCfgBrightness()
 unsigned int GetCfgUpdateInterval()
 {
 	return cfg_updateInterval;
+}
+
+unsigned int GetCfgStartLed()
+{
+	return cfg_startLed;
+}
+
+unsigned int GetCfgLedDirection()
+{
+	return cfg_ledDirection;
 }
 
 unsigned int GetCfgLineStyle()
