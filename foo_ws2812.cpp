@@ -4,56 +4,22 @@
 #include "stdafx.h"
 #include "foo_ws2812.h"
 
-service_ptr_t<visualisation_stream_v3> ws2812_stream;
 
-HANDLE	ws2812_hComm = INVALID_HANDLE_VALUE;
-HANDLE	ws2812_hTimer = INVALID_HANDLE_VALUE;
-
-DWORD	ws2812_commErr;
-
-LPCWSTR const	ws2812_port_str = L"COM7";
-unsigned int	ws2812_comPort = 7;
-
-unsigned int	ws2812_fft_size = 4 * 1024;
-
-bool		ws2812_init_done = false;
-
-unsigned int	ws2812_rows = 8;
-unsigned int	ws2812_columns = 30;
-unsigned int	ws2812_led_mode = 0;
-unsigned int	ws2812_lineStyle = 0;
-
-unsigned int	ws2812_brightness = 25;
-
-DWORD		ws2812_timerStartDelay = 500;
-DWORD		ws2812_timerInverval = 100;
-
-bool		ws2812_timerStarted = false;
-
-bool		ws2812_logFrequency = true;
-bool		ws2812_peakValues = true;
-bool		ws2812_logAmplitude = true;
-
-unsigned int	ws2812_bufferSize = 0;
-unsigned char	*ws2812_outputBuffer = nullptr;
-unsigned char	*ws2812_persistenceBuffer = nullptr;
+// global class instance
+ws2812			*ws2812_global = nullptr;
 
 
-void OutputTest(const audio_sample *psample, int samples, audio_sample peak, unsigned char *buffer, int bufferSize);
-void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer, unsigned int rows, unsigned int cols);
-
-void CalcAndOutput(void);
 
 // COM port handling taken from the MSDN
-BOOL OpenPort(LPCWSTR gszPort, unsigned int port)
+BOOL ws2812::OpenPort(LPCWSTR gszPort, unsigned int port)
 {
-	if (ws2812_hComm == INVALID_HANDLE_VALUE) {
+	if (hComm == INVALID_HANDLE_VALUE) {
 		WCHAR	portStr[32];
 		LPCWSTR	format = L"COM%u";
 
 		wsprintf(portStr, format, port);
 
-		ws2812_hComm = CreateFile(portStr,
+		hComm = CreateFile(portStr,
 			GENERIC_READ | GENERIC_WRITE,
 			0,
 			0,
@@ -61,9 +27,9 @@ BOOL OpenPort(LPCWSTR gszPort, unsigned int port)
 			FILE_FLAG_OVERLAPPED,
 			0);
 	}
-	if (ws2812_hComm == INVALID_HANDLE_VALUE) {
+	if (hComm == INVALID_HANDLE_VALUE) {
 		// error opening port; abort
-		ws2812_commErr = GetLastError();
+		commErr = GetLastError();
 		return false;
 	}
 
@@ -72,7 +38,7 @@ BOOL OpenPort(LPCWSTR gszPort, unsigned int port)
 	ZeroMemory(&dcb, sizeof(dcb));
 
 	// get current DCB
-	if (GetCommState(ws2812_hComm, &dcb)) {
+	if (GetCommState(hComm, &dcb)) {
 		// Update DCB rate.
 	//	dcb.BaudRate = CBR_9600;
 		// Disable flow controls
@@ -81,7 +47,7 @@ BOOL OpenPort(LPCWSTR gszPort, unsigned int port)
 		dcb.fRtsControl = RTS_CONTROL_DISABLE;
 
 		// Set new state.
-		if (!SetCommState(ws2812_hComm, &dcb)) {
+		if (!SetCommState(hComm, &dcb)) {
 			// Error in SetCommState. Possibly a problem with the communications 
 			// port handle or a problem with the DCB structure itself.
 		}
@@ -89,17 +55,17 @@ BOOL OpenPort(LPCWSTR gszPort, unsigned int port)
 	return true;
 }
 
-BOOL ClosePort()
+BOOL ws2812::ClosePort()
 {
-	if (ws2812_hComm != INVALID_HANDLE_VALUE) {
-		CloseHandle(ws2812_hComm);
-		ws2812_hComm = INVALID_HANDLE_VALUE;
+	if (hComm != INVALID_HANDLE_VALUE) {
+		CloseHandle(hComm);
+		hComm = INVALID_HANDLE_VALUE;
 		return true;
 	}
 	return false;
 }
 
-BOOL WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
+BOOL ws2812::WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
 {
 	OVERLAPPED osWrite = { 0 };
 	DWORD dwWritten;
@@ -107,7 +73,7 @@ BOOL WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
 	BOOL fRes;
 
 	// Port not opened?
-	if (ws2812_hComm == INVALID_HANDLE_VALUE)
+	if (hComm == INVALID_HANDLE_VALUE)
 		return false;
 
 	// Create this write operation's OVERLAPPED structure's hEvent.
@@ -118,9 +84,9 @@ BOOL WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
 	}
 
 	// Issue write.
-	if (!WriteFile(ws2812_hComm, lpBuf, dwToWrite, &dwWritten, &osWrite)) {
-		ws2812_commErr = GetLastError();
-		if (ws2812_commErr != ERROR_IO_PENDING) {
+	if (!WriteFile(hComm, lpBuf, dwToWrite, &dwWritten, &osWrite)) {
+		commErr = GetLastError();
+		if (commErr != ERROR_IO_PENDING) {
 			// WriteFile failed, but isn't delayed. Report error and abort.
 			fRes = FALSE;
 		}
@@ -131,7 +97,7 @@ BOOL WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
 			{
 				// OVERLAPPED structure's event has been signaled. 
 			case WAIT_OBJECT_0:
-				if (!GetOverlappedResult(ws2812_hComm, &osWrite, &dwWritten, FALSE))
+				if (!GetOverlappedResult(hComm, &osWrite, &dwWritten, FALSE))
 					fRes = FALSE;
 				else
 					// Write operation completed successfully.
@@ -157,122 +123,54 @@ BOOL WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
 
 VOID CALLBACK WaitOrTimerCallback(PVOID lpParameter, BOOLEAN TimerOrWaitFired)
 {
-	CalcAndOutput();
+	if (ws2812_global)
+		ws2812_global->CalcAndOutput();
 }
 
-bool StartTimer()
+bool ws2812::StartTimer()
 {
-	if (CreateTimerQueueTimer(&ws2812_hTimer, NULL,
-		WaitOrTimerCallback, NULL, ws2812_timerStartDelay,
-		ws2812_timerInverval, WT_EXECUTELONGFUNCTION))
-	{
-		// success
-		ws2812_timerStarted = true;
-	} else {
-		// failed
-		ws2812_timerStarted = false;
+	if (timerInterval < timerInterval_min)
+		timerInterval = timerInterval_min;
+	else if (timerInterval > timerInterval_max)
+		timerInterval = timerInterval_max;
+
+	if (hTimer == INVALID_HANDLE_VALUE) {
+		// timer not created yet
+		if (CreateTimerQueueTimer(&hTimer, NULL,
+			WaitOrTimerCallback, NULL, timerStartDelay,
+			timerInterval, WT_EXECUTELONGFUNCTION))
+		{
+			// success
+			timerStarted = true;
+		}
+		else {
+			// failed
+			timerStarted = false;
+		}
 	}
-	return ws2812_timerStarted;
+	else {
+		// already created
+	}
+	return timerStarted;
 }
 
-bool StopTimer()
+bool ws2812::StopTimer()
 {
-	ws2812_timerStarted = false;
+	timerStarted = false;
 
-	if (ws2812_hTimer != INVALID_HANDLE_VALUE) {
-		DeleteTimerQueueTimer(NULL, ws2812_hTimer, NULL);
-		ws2812_hTimer = INVALID_HANDLE_VALUE;
+	if (hTimer != INVALID_HANDLE_VALUE) {
+		DeleteTimerQueueTimer(NULL, hTimer, NULL);
+		hTimer = INVALID_HANDLE_VALUE;
 		return true;
 	}
 	return false;
 }
 
-void InitOutput()
+void ws2812::OutputTest(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer, unsigned int bufferSize)
 {
-	// ask the global visualisation manager to create a stream for us
-	static_api_ptr_t<visualisation_manager>()->create_stream(ws2812_stream, visualisation_manager::KStreamFlagNewFFT);
-
-	// I probably should test this
-	if (ws2812_stream != nullptr) {
-		// mono is preferred, unless you want to use two displays ;-)
-		ws2812_stream->set_channel_mode(visualisation_stream_v2::channel_mode_mono);
-#if 0
-		// open the COM port
-		if (OpenPort(ws2812_port_str, 7)) {
-			// init done :-)
-			ws2812_init_done = true;
-		}
-#endif
-		// read configuration values
-		ws2812_comPort = GetCfgComPort();
-		if (ws2812_comPort < 1 || ws2812_comPort > 127)
-			ws2812_comPort = 1;
-
-		ws2812_rows = GetCfgMatrixRows();
-		if (ws2812_rows < 1 || ws2812_rows > 30)
-			ws2812_rows = 8;
-
-		ws2812_columns = GetCfgMatrixCols();
-		if (ws2812_columns < 1 || ws2812_columns > 30)
-			ws2812_columns = 8;
-
-		ws2812_timerInverval = GetCfgUpdateInterval();
-		if (ws2812_timerInverval < 50 || ws2812_timerInverval > 1000)
-			ws2812_timerInverval = 250;
-
-		ws2812_brightness = GetCfgBrightness();
-		if (ws2812_brightness < 1 || ws2812_brightness > 100)
-			ws2812_brightness = 25;
-
-		ws2812_lineStyle = GetCfgLineStyle();
-		if (ws2812_lineStyle > 2)
-			ws2812_lineStyle = 0;
-
-		ws2812_logFrequency = GetCfgLogFrequency() != 0;
-		ws2812_logAmplitude = GetCfgLogAmplitude() != 0;
-		ws2812_peakValues = GetCfgPeakValues() != 0;
-
-		// 240 LEDs, RGB for each, plus one start byte
-		ws2812_bufferSize = 1 + 3 * ws2812_rows * ws2812_columns;
-		ws2812_outputBuffer = new unsigned char[ws2812_bufferSize];
-		ws2812_persistenceBuffer = new unsigned char[ws2812_bufferSize];
-
-		if (ws2812_outputBuffer && ws2812_persistenceBuffer) {
-			ZeroMemory(ws2812_outputBuffer, ws2812_bufferSize);
-			ZeroMemory(ws2812_persistenceBuffer, ws2812_bufferSize);
-
-			ws2812_init_done = true;
-		}
-	}
-}
-
-void DeinitOutput()
-{
-	// how to delete the stream?
-//	delete ws2812_stream;
-
-	// kill the timer
-	StopTimer();
-
-	// close the COM port
-	ClosePort();
-
-	if (ws2812_outputBuffer)
-		delete ws2812_outputBuffer;
-	ws2812_outputBuffer = nullptr;
-
-	if (ws2812_persistenceBuffer)
-		delete ws2812_persistenceBuffer;
-	ws2812_persistenceBuffer = nullptr;
-
-	ws2812_init_done = false;
-}
-
-void OutputTest(const audio_sample *psample, int samples, audio_sample peak, unsigned char *buffer, int bufferSize)
-{
-	int		i;
+	unsigned int	i;
 	audio_sample	sample;
-	int		bright = ws2812_brightness;
+	unsigned int	bright = (brightness * 255) / 100;
 
 	// limit analyzed samples to size of buffer
 	if (samples > bufferSize)
@@ -295,39 +193,42 @@ void OutputTest(const audio_sample *psample, int samples, audio_sample peak, uns
 		buffer[i] = 0;
 }
 
-unsigned int LedIndex(unsigned int row, unsigned int col, unsigned int rows, unsigned int cols, int mode)
+unsigned int ws2812::LedIndex(unsigned int row, unsigned int col)
 {
 	unsigned int	result = 0;
 
-	switch (mode)
+	switch (ledMode)
 	{
-	case 0:		// Top Left, Common direction left to right
-		result = row * cols + col;
+	case ws2812_led_mode_top_left_common:			// Top Left, Common direction left to right
+		result = row * columns + col;
 		break;
 
-	case 1:		// Top Right, Common direction right to left
-		result = row * cols + (cols - 1 - col);
+	case ws2812_led_mode_top_right_common:			// Top Right, Common direction right to left
+		result = row * columns + (columns - 1 - col);
 		break;
 
-	case 2:		// Bottom Left, Common direction left to right
-		result = (rows - 1 - row) * cols + col;
+	case ws2812_led_mode_bottom_left_common:		// Bottom Left, Common direction left to right
+		result = (rows - 1 - row) * columns + col;
 		break;
 
-	case 3:		// Bottom Right, Common direction right to left
-		result = (rows - 1 - row) * cols + (cols - 1 - col);
+	case ws2812_led_mode_bottom_right_common:		// Bottom Right, Common direction right to left
+		result = (rows - 1 - row) * columns + (columns - 1 - col);
 		break;
 
-	case 4:		// Top Left, Alternating direction left to right/right to left
+	case ws2812_led_mode_top_left_alternating:		// Top Left, Alternating direction left to right/right to left
+	case ws2812_led_mode_top_right_alternating:		// Top Right, Alternating direction right to left/left to right
+	case ws2812_led_mode_bottom_left_alternating:	// Bottom Left, Alternating direction left to right/right to left
+	case ws2812_led_mode_bottom_right_alternating:	// Bottom Right, Alternating right to left/direction left to right
 		break;
 	}
 
-	if (result < rows * cols)
+	if (result < rows * columns)
 		return result;
 
 	return 0;
 }
 
-void CalcColorWhiteBar(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
+void ws2812::CalcColorWhiteBar(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
 {
 	if ((audio_sample)row > sample) {
 		// off
@@ -343,9 +244,9 @@ void CalcColorWhiteBar(unsigned int row, audio_sample sample, unsigned int &r, u
 	}
 }
 
-void CalcRowColor(audio_sample row, unsigned int &r, unsigned int &g, unsigned int &b)
+void ws2812::CalcRowColor(audio_sample row, unsigned int &r, unsigned int &g, unsigned int &b)
 {
-	audio_sample	row_max = (audio_sample)ws2812_rows - 1;
+	audio_sample	row_max = (audio_sample)rows - 1;
 	audio_sample	r_start, g_start, b_start;
 	audio_sample	r_end, g_end, b_end;
 
@@ -371,7 +272,7 @@ void CalcRowColor(audio_sample row, unsigned int &r, unsigned int &g, unsigned i
 	b = (unsigned int)b_end;
 }
 
-void CalcColorColoredRows(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
+void ws2812::CalcColorColoredRows(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
 {
 	if ((audio_sample)row > sample) {
 		// off
@@ -391,7 +292,7 @@ void CalcColorColoredRows(unsigned int row, audio_sample sample, unsigned int &r
 	}
 }
 
-void CalcColorColoredBars(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
+void ws2812::CalcColorColoredBars(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
 {
 	if ((audio_sample)row > sample) {
 		// off
@@ -411,11 +312,12 @@ void CalcColorColoredBars(unsigned int row, audio_sample sample, unsigned int &r
 	}
 }
 
-void CalcColor(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
+void ws2812::CalcColor(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
 {
-	switch (ws2812_lineStyle)
+	switch (lineStyle)
 	{
-	case 0:		// simple white bars
+	default:
+	case ws2812_spectrum_simple:		// simple white bars
 		if ((audio_sample)row > sample) {
 			// off
 			r = g = b = 0;
@@ -430,7 +332,7 @@ void CalcColor(unsigned int row, audio_sample sample, unsigned int &r, unsigned 
 		}
 		break;
 
-	case 1:		// from green to red, each row a single color
+	case ws2812_spectrum_green_red_bars:		// from green to red, each row a single color
 		if ((audio_sample)row > sample) {
 			// off
 			r = g = b = 0;
@@ -445,7 +347,7 @@ void CalcColor(unsigned int row, audio_sample sample, unsigned int &r, unsigned 
 		}
 		break;
 
-	case 2:		// from green to red, each bar the same color (fire style)
+	case ws2812_spectrum_fire_lines:		// from green to red, each bar the same color (fire style)
 		if ((audio_sample)row > sample) {
 			// off
 			r = g = b = 0;
@@ -462,7 +364,7 @@ void CalcColor(unsigned int row, audio_sample sample, unsigned int &r, unsigned 
 	}
 }
 
-void CalcPersistence(unsigned int &c, unsigned int &p_c)
+void ws2812::CalcPersistence(unsigned int &c, unsigned int &p_c)
 {
 	if (c >= p_c) {
 		p_c = c;
@@ -481,24 +383,24 @@ void CalcPersistence(unsigned int &c, unsigned int &p_c)
 	}
 }
 
-void AddPersistence(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b)
+void ws2812::AddPersistence(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b)
 {
 	unsigned int	p_r, p_g, p_b;
 
-	p_r = ws2812_persistenceBuffer[3 * led_index + 0];
-	p_g = ws2812_persistenceBuffer[3 * led_index + 1];
-	p_b = ws2812_persistenceBuffer[3 * led_index + 2];
+	p_r = persistenceBuffer[3 * led_index + 0];
+	p_g = persistenceBuffer[3 * led_index + 1];
+	p_b = persistenceBuffer[3 * led_index + 2];
 
 	CalcPersistence(r, p_r);
 	CalcPersistence(g, p_g);
 	CalcPersistence(b, p_b);
 
-	ws2812_persistenceBuffer[3 * led_index + 0] = p_r;
-	ws2812_persistenceBuffer[3 * led_index + 1] = p_g;
-	ws2812_persistenceBuffer[3 * led_index + 2] = p_b;
+	persistenceBuffer[3 * led_index + 0] = p_r;
+	persistenceBuffer[3 * led_index + 1] = p_g;
+	persistenceBuffer[3 * led_index + 2] = p_b;
 }
 
-void ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned int &g, unsigned int &b)
+void ws2812::ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned int &g, unsigned int &b)
 {
 	// apply brightness
 	r = (r * brightness) / 255;
@@ -506,7 +408,7 @@ void ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned int &g, 
 	b = (b * brightness) / 255;
 }
 
-void LedToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b)
+void ws2812::LedToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b)
 {
 	// all values < 2 are replaced by 0 (1 is reserved for start of block)
 	if (r < 2)	r = 0;
@@ -520,17 +422,18 @@ void LedToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int &r,
 	buffer[3 * led_index + 2] = (unsigned char)b;
 }
 
-void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer, unsigned int rows, unsigned int cols)
+void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer)
 {
+	unsigned int	rows = this->rows;
+	unsigned int	cols = this->columns;
 	unsigned int	bar, cnt, row;
 	unsigned int	bar_cnt;
 	unsigned int	samples_per_bar;
 	unsigned int	sample_index;
 	unsigned int	led_index;
 	unsigned int	r, g, b;
-	unsigned int	bright = (255 * ws2812_brightness) / 100;
-	int				line_style = ws2812_lineStyle;
-	int				led_mode = ws2812_led_mode;
+	unsigned int	bright = (255 * this->brightness) / 100;
+	enum line_style	line_style = this->lineStyle;
 	audio_sample	sum;
 	audio_sample	sample;
 	audio_sample	db_per_row;
@@ -572,7 +475,7 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 	sample_index = 0;
 
 	for (bar = 0; bar < bar_cnt; bar++) {
-		if (ws2812_logFrequency == false) {
+		if (logFrequency == false) {
 			// linear frequency scaling
 
 			if (bar == (bar_cnt - 1)) {
@@ -585,7 +488,7 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 					samples_per_bar = samples - sample_index;
 			}
 
-			if (ws2812_peakValues == false) {
+			if (peakValues == false) {
 				// calc mean value of samples per bar
 				sum = 0;
 				for (cnt = 0; cnt < samples_per_bar; cnt++) {
@@ -593,7 +496,7 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 					sum += fabs(sample);
 				}
 
-				if (ws2812_logAmplitude) {
+				if (logAmplitude) {
 					// calc ratio to peak, logarithmic scale: volts to db
 					sample = 20 * log10(sum / peak);
 				}
@@ -612,7 +515,7 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 						sum = sample;
 				}
 
-				if (ws2812_logAmplitude) {
+				if (logAmplitude) {
 					// logarithmic scale: volts to db
 					sample = 20 * log10(sum);
 				}
@@ -666,7 +569,7 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 					samples_per_bar = samples - sample_index;
 			}
 
-			if (ws2812_peakValues == false) {
+			if (peakValues == false) {
 				// calc mean value of samples per bar
 				sum = 0;
 				for (cnt = 0; cnt < samples_per_bar; cnt++) {
@@ -674,7 +577,7 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 					sum += fabs(sample);
 				}
 
-				if (ws2812_logAmplitude) {
+				if (logAmplitude) {
 					// calc ratio to peak, logarithmic scale: volts to db
 					sample = 20 * log10(sum / peak);
 				}
@@ -693,7 +596,7 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 						sum = sample;
 				}
 
-				if (ws2812_logAmplitude) {
+				if (logAmplitude) {
 					// logarithmic scale: volts to db
 					sample = 20 * log10(sum);
 				}
@@ -723,10 +626,10 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 		switch (line_style)
 		{
 		default:
-		case 0:		// simple white bars
+		case ws2812_spectrum_simple:		// simple white bars
 			for (row = 1; row <= rows; row++) {
 				// led order: start is top left
-				led_index = LedIndex(rows - row, bar, rows, cols, led_mode);
+				led_index = LedIndex(rows - row, bar);
 
 				CalcColorWhiteBar(row, sample, r, g, b);
 
@@ -738,10 +641,10 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 			}
 			break;
 
-		case 1:		// from green to red, each row a single color
+		case ws2812_spectrum_green_red_bars:		// from green to red, each row a single color
 			for (row = 1; row <= rows; row++) {
 				// led order: start is top left
-				led_index = LedIndex(rows - row, bar, rows, cols, led_mode);
+				led_index = LedIndex(rows - row, bar);
 
 				CalcColorColoredRows(row, sample, r, g, b);
 
@@ -753,11 +656,10 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 			}
 			break;
 
-		case 2:		// fire style: from green to red the whole bar a single color
-
+		case ws2812_spectrum_fire_lines:		// fire style: from green to red the whole bar a single color
 			for (row = 1; row <= rows; row++) {
 				// led order: start is top left
-				led_index = LedIndex(rows - row, bar, rows, cols, led_mode);
+				led_index = LedIndex(rows - row, bar);
 
 				CalcColorColoredBars(row, sample, r, g, b);
 
@@ -776,17 +678,17 @@ void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio
 //		buffer[i] = 0;
 }
 
-void CalcAndOutput(void)
+void ws2812::CalcAndOutput(void)
 {
 	double	abs_time;
 
 	// get current track time
-	if (ws2812_stream->get_absolute_time(abs_time)) {
+	if (visStream->get_absolute_time(abs_time)) {
 		audio_chunk_fast_impl	chunk;
-		unsigned int			fft_size = ws2812_fft_size;
+		unsigned int			fft_size = fftSize;
 
 		// FFT data
-		if (ws2812_stream->get_spectrum_absolute(chunk, abs_time, fft_size)) {
+		if (visStream->get_spectrum_absolute(chunk, abs_time, fft_size)) {
 			// number of channels, should be 1
 			unsigned int	channels = chunk.get_channel_count();
 			// number of samples in the chunk, fft_size / 2
@@ -798,16 +700,15 @@ void CalcAndOutput(void)
 
 			// convert samples
 			const audio_sample *psample = chunk.get_data();
-			if (ws2812_outputBuffer != nullptr && psample != nullptr && samples > 0) {
-
+			if (outputBuffer != nullptr && psample != nullptr && samples > 0) {
 				// a value of 1 is used as start byte
 				// and must not occur in other bytes in the buffer
-				ws2812_outputBuffer[0] = 1;
+				outputBuffer[0] = 1;
 
-				OutputSpectrumBars(psample, samples, peak, delta_f, &ws2812_outputBuffer[1], ws2812_rows, ws2812_columns);
+				OutputSpectrumBars(psample, samples, peak, delta_f, &outputBuffer[1]);
 
 				// send buffer
-				WriteABuffer(ws2812_outputBuffer, ws2812_bufferSize);
+				WriteABuffer(outputBuffer, bufferSize);
 
 			}
 			else {
@@ -823,11 +724,11 @@ void CalcAndOutput(void)
 	}
 }
 
-bool StopOutput(void)
+bool ws2812::StopOutput(void)
 {
 	bool	isRunning = false;
 
-	if (ws2812_init_done && ws2812_timerStarted) {
+	if (initDone && timerStarted) {
 		isRunning = true;
 
 		StopTimer();
@@ -836,72 +737,168 @@ bool StopOutput(void)
 	return isRunning;
 }
 
-bool StartOutput(void)
+bool StopOutput(void)
 {
-	if (ws2812_init_done && ws2812_timerStarted == false) {
-		if (OpenPort(NULL, ws2812_comPort)) {
+	if (ws2812_global)
+		return ws2812_global->StopOutput();
+
+	return false;
+}
+
+bool ws2812::StartOutput(void)
+{
+	if (initDone && timerStarted == false) {
+		if (OpenPort(NULL, comPort)) {
 			StartTimer();
 		}
 	}
-	return ws2812_timerStarted;
+	return timerStarted;
+}
+
+bool StartOutput(void)
+{
+	if (ws2812_global)
+		return ws2812_global->StartOutput();
+
+	return false;
 }
 
 bool ToggleOutput(void)
 {
-//	try {
-		if (ws2812_init_done) {
-			// toggle timer state
-			if (ws2812_timerStarted == false) {
-				if (OpenPort(NULL, ws2812_comPort)) {
-					StartTimer();
-				}
-			} else {
-				StopTimer();
-				ClosePort();
-			}
-		} else {
-			popup_message::g_show("Not initialised!", "WS2812 Output", popup_message::icon_error);
-		}
-//	}
-//	catch (std::exception const & e) {
-//		popup_message::g_complain("WS2812 Output exception", e);
-//	}
+	if (ws2812_global)
+		return ws2812_global->ToggleOutput();
 
-	return ws2812_timerStarted;
+	return false;
 }
 
+bool ws2812::ToggleOutput(void)
+{
+	if (initDone) {
+		// toggle timer state
+		if (timerStarted == false) {
+			if (OpenPort(NULL, comPort)) {
+				if (StartTimer()) {
+
+				}
+				else {
+					popup_message::g_show("Start timer failed!", "WS2812 Output", popup_message::icon_error);
+				}
+			}
+			else {
+				popup_message::g_show("Open COM port failed!", "WS2812 Output", popup_message::icon_error);
+			}
+		}
+		else {
+			StopTimer();
+			ClosePort();
+		}
+	}
+	else {
+		popup_message::g_show("Not initialised!", "WS2812 Output", popup_message::icon_error);
+	}
+
+	return timerStarted;
+}
 
 void ConfigMatrix(int rows, int cols, int start_led, int led_dir)
 {
+	if (ws2812_global)
+		ws2812_global->ConfigMatrix(rows, cols, (enum start_led)start_led, (enum led_direction)led_dir);
+}
+
+void ws2812::ConfigMatrix(int rows, int cols, enum start_led start_led, enum led_direction led_dir)
+{
 	bool	timerRunning;
 
-	if (rows > 0 && rows <= 32 && cols > 0 && cols <= 32) {
-		ws2812_rows = rows;
-		ws2812_columns = cols;
+	if (rows < 0)
+		rows = this->rows;
+	if (cols < 0)
+		cols = this->columns;
 
-		// kill the timer
-		timerRunning = StopTimer();
+	if (   (unsigned int)rows >= rows_min && (unsigned int)rows <= rows_max
+		&& (unsigned int)cols >= columns_min && (unsigned int)cols <= columns_max)
+	{
+		if (   this->rows != (unsigned int)rows
+			|| this->columns != (unsigned int)cols)
+		{
+			initDone = false;
 
-		if (ws2812_outputBuffer)
-			delete ws2812_outputBuffer;
-		ws2812_outputBuffer = nullptr;
+			this->rows = (unsigned int)rows;
+			this->columns = (unsigned int)cols;
 
-		if (ws2812_persistenceBuffer)
-			delete ws2812_persistenceBuffer;
-		ws2812_persistenceBuffer = nullptr;
+			// kill the timer
+			timerRunning = StopTimer();
 
-		ws2812_init_done = false;
+			if (outputBuffer)
+				delete outputBuffer;
+			outputBuffer = nullptr;
 
-		// 240 LEDs, RGB for each, plus one start byte
-		ws2812_bufferSize = 1 + 3 * ws2812_rows * ws2812_columns;
-		ws2812_outputBuffer = new unsigned char[ws2812_bufferSize];
-		ws2812_persistenceBuffer = new unsigned char[ws2812_bufferSize];
+			if (persistenceBuffer)
+				delete persistenceBuffer;
+			persistenceBuffer = nullptr;
 
-		if (ws2812_outputBuffer && ws2812_persistenceBuffer) {
-			ZeroMemory(ws2812_outputBuffer, ws2812_bufferSize);
-			ZeroMemory(ws2812_persistenceBuffer, ws2812_bufferSize);
+			// 240 LEDs, RGB for each, plus one start byte
+			initDone = CreateBuffer();
+			if (initDone) {
+				if (timerRunning) {
+					StartTimer();
+				}
+			}
+		}
+	}
+}
 
-			ws2812_init_done = true;
+void SetScaling(int logFrequency, int logAmplitude, int peakValues)
+{
+	if (ws2812_global)
+		ws2812_global->SetScaling(logFrequency, logAmplitude, peakValues);
+}
+
+void ws2812::SetScaling(int logFrequency, int logAmplitude, int peakValues)
+{
+	if (logFrequency == 0)
+		this->logFrequency = false;
+	else if (logFrequency > 0)
+		this->logFrequency = true;
+
+	if (logAmplitude == 0)
+		this->logAmplitude = false;
+	else if (logAmplitude > 0)
+		this->logAmplitude = true;
+
+	if (peakValues == 0)
+		this->peakValues = false;
+	else if (peakValues > 0)
+		this->peakValues = true;
+}
+
+void SetLineStyle(unsigned int lineStyle)
+{
+	if (ws2812_global)
+		ws2812_global->SetLineStyle((enum line_style)lineStyle);
+}
+
+void ws2812::SetLineStyle(enum line_style style)
+{
+	if (style >= 0 && style < ws2812_line_style_no)
+		this->lineStyle = style;
+}
+
+void SetBrightness(unsigned int brightness)
+{
+	if (ws2812_global)
+		ws2812_global->SetBrightness(brightness);
+}
+
+void ws2812::SetBrightness(unsigned int brightness)
+{
+	bool	timerRunning;
+
+	if (brightness >= brightness_min && brightness <= brightness_max) {
+		if (this->brightness != brightness) {
+			timerRunning = StopTimer();
+
+			this->brightness = brightness;
 
 			if (timerRunning) {
 				StartTimer();
@@ -910,70 +907,211 @@ void ConfigMatrix(int rows, int cols, int start_led, int led_dir)
 	}
 }
 
-void SetScaling(int logFrequency, int logAmplitude, int peakValues)
-{
-	if (logFrequency == 0)
-		ws2812_logFrequency = false;
-	else if (logFrequency > 0)
-		ws2812_logFrequency = true;
-
-	if (logAmplitude == 0)
-		ws2812_logAmplitude = false;
-	else if (logAmplitude > 0)
-		ws2812_logAmplitude = true;
-
-	if (peakValues == 0)
-		ws2812_peakValues = false;
-	else if (peakValues > 0)
-		ws2812_peakValues = true;
-}
-
-void SetLineStyle(unsigned int lineStyle)
-{
-	if (lineStyle < 3)
-		ws2812_lineStyle = lineStyle;
-}
-
-void SetBrightness(unsigned int brightness)
-{
-	bool	timerRunning;
-
-	if (brightness > 0 && brightness <= 100) {
-		timerRunning = StopTimer();
-
-		ws2812_brightness = brightness;
-
-		if (timerRunning) {
-			StartTimer();
-		}
-	}
-}
-
 void SetComPort(unsigned int port)
 {
+	if (ws2812_global)
+		ws2812_global->SetComPort(port);
+}
+
+bool ws2812::SetComPort(unsigned int port)
+{
+	bool	result = false;
 	bool	timerRunning;
 
-	if (port > 0 && port < 127 && port != ws2812_comPort) {
-		ws2812_comPort = port;
+	if (port >= port_min && port <= port_max) {
+		if (port != comPort) {
+			comPort = port;
 
-		timerRunning = StopTimer();
+			timerRunning = StopTimer();
 
-		ClosePort();
+			ClosePort();
 
-		if (timerRunning) {
-			if (OpenPort(NULL, ws2812_comPort)) {
-				StartTimer();
+			if (timerRunning) {
+				if (OpenPort(NULL, comPort)) {
+					StartTimer();
+					result = true;
+				}
+			}
+		}
+	}
+	return result;
+}
+
+void SetInterval(unsigned int interval)
+{
+	if (ws2812_global)
+		ws2812_global->SetInterval(interval);
+}
+
+void ws2812::SetInterval(unsigned int interval)
+{
+	if (interval >= timerInterval_min && interval <= timerInterval_max) {
+		if (interval != timerInterval) {
+			timerInterval = interval;
+			if (hTimer != INVALID_HANDLE_VALUE) {
+				ChangeTimerQueueTimer(NULL, hTimer, timerStartDelay, timerInterval);
 			}
 		}
 	}
 }
 
-void SetInterval(unsigned int interval)
+bool ws2812::CreateBuffer()
 {
-	if (interval >= 50 && interval < 1000 && interval != ws2812_timerInverval) {
-		ws2812_timerInverval = interval;
-		if (ws2812_hTimer != INVALID_HANDLE_VALUE) {
-			ChangeTimerQueueTimer(NULL, ws2812_hTimer, ws2812_timerStartDelay, ws2812_timerInverval);
-		}
+	bufferSize = 1 + 3 * rows * columns;
+	outputBuffer = new unsigned char[bufferSize];
+	persistenceBuffer = new unsigned char[bufferSize];
+
+	if (outputBuffer && persistenceBuffer) {
+		ZeroMemory(outputBuffer, bufferSize);
+		ZeroMemory(persistenceBuffer, bufferSize);
+		return true;
+	}
+	return false;
+}
+
+
+
+ws2812::ws2812()
+{
+	hComm = INVALID_HANDLE_VALUE;
+	hTimer = INVALID_HANDLE_VALUE;
+	bufferSize = 0;
+	outputBuffer = nullptr;
+	persistenceBuffer = nullptr;
+
+	// ask the global visualisation manager to create a stream for us
+	static_api_ptr_t<visualisation_manager>()->create_stream(visStream, visualisation_manager::KStreamFlagNewFFT);
+
+	// I probably should test this
+	if (visStream != nullptr) {
+		// mono is preferred, unless you want to use two displays ;-)
+		visStream->set_channel_mode(visualisation_stream_v2::channel_mode_mono);
+
+		// read configuration values
+		comPort = GetCfgComPort();
+		if (comPort < port_min || comPort > port_max)
+			comPort = port_def;
+
+		rows = GetCfgMatrixRows();
+		if (rows < rows_min || rows > rows_max)
+			rows = rows_def;
+
+		columns = GetCfgMatrixCols();
+		if (columns < columns_min || columns > columns_max)
+			columns = columns_def;
+
+		timerInterval = GetCfgUpdateInterval();
+		if (timerInterval < 50 || timerInterval > 1000)
+			timerInterval = 250;
+
+		brightness = GetCfgBrightness();
+		if (brightness < 1 || brightness > 100)
+			brightness = 25;
+
+		unsigned int tmp = GetCfgLineStyle();
+		if (tmp > ws2812_line_style_no)
+			lineStyle = ws2812_spectrum_simple;
+		else
+			lineStyle = (enum line_style)tmp;
+
+		logFrequency = GetCfgLogFrequency() != 0;
+		logAmplitude = GetCfgLogAmplitude() != 0;
+		peakValues = GetCfgPeakValues() != 0;
+
+		// 240 LEDs, RGB for each, plus one start byte
+		initDone = CreateBuffer();
+	}
+}
+
+ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, unsigned int interval, enum line_style style)
+{
+	hComm = INVALID_HANDLE_VALUE;
+	hTimer = INVALID_HANDLE_VALUE;
+	bufferSize = 0;
+	outputBuffer = nullptr;
+	persistenceBuffer = nullptr;
+
+	// ask the global visualisation manager to create a stream for us
+	static_api_ptr_t<visualisation_manager>()->create_stream(visStream, visualisation_manager::KStreamFlagNewFFT);
+
+	// I probably should test this
+	if (visStream != nullptr) {
+		// mono is preferred, unless you want to use two displays ;-)
+		visStream->set_channel_mode(visualisation_stream_v2::channel_mode_mono);
+
+		// read configuration values
+		if (port >= 1 && port < 127)
+			this->comPort = port;
+		else
+			this->comPort = 1;
+
+		if (rows >= rows_min && rows <= rows_max)
+			this->rows = rows;
+		else
+			this->rows = rows_def;
+
+		if (cols >= columns_min && cols <= columns_max)
+			this->columns = cols;
+		else
+			this->columns = columns_def;
+
+		if (interval >= timerInterval_min && interval <= timerInterval_max)
+			this->timerInterval = interval;
+		else
+			this->timerInterval = timerInterval_def;
+
+		this->brightness = brightness_def;
+
+		if (style >= 0 && style < ws2812_line_style_no)
+			this->lineStyle = style;
+		else
+			this->lineStyle = ws2812_spectrum_simple;
+
+		logFrequency = true;
+		logAmplitude = true;
+		peakValues = true;
+
+		// 240 LEDs, RGB for each, plus one start byte
+		initDone = CreateBuffer();
+	}
+}
+
+ws2812::~ws2812()
+{
+	initDone = false;
+
+	// how to delete the stream?
+//	delete visStream;
+
+	// kill the timer
+	StopTimer();
+
+	// close the COM port
+	ClosePort();
+
+	if (outputBuffer)
+		delete outputBuffer;
+	outputBuffer = nullptr;
+
+	if (persistenceBuffer)
+		delete persistenceBuffer;
+	persistenceBuffer = nullptr;
+}
+
+void InitOutput()
+{
+	if (ws2812_global == nullptr)
+		ws2812_global = new ws2812();
+
+	if (ws2812_global) {
+
+	}
+}
+
+void DeinitOutput()
+{
+	if (ws2812_global) {
+		delete ws2812_global;
+		ws2812_global = nullptr;
 	}
 }
