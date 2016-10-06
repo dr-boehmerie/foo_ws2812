@@ -42,14 +42,21 @@ BOOL ws2812::OpenPort(LPCWSTR gszPort, unsigned int port)
 		// Update DCB rate.
 	//	dcb.BaudRate = CBR_9600;
 		// Disable flow controls
-		dcb.fOutxCtsFlow = false;
-		dcb.fOutxDsrFlow = false;
-		dcb.fRtsControl = RTS_CONTROL_DISABLE;
+		dcb.fOutxCtsFlow = FALSE;
+		dcb.fOutxDsrFlow = FALSE;
+		// must set reception control lines to high state (arduino won't receive data otherwise)
+		dcb.fRtsControl = RTS_CONTROL_ENABLE;
+		dcb.fDtrControl = DTR_CONTROL_ENABLE;
 
 		// Set new state.
 		if (!SetCommState(hComm, &dcb)) {
 			// Error in SetCommState. Possibly a problem with the communications 
 			// port handle or a problem with the DCB structure itself.
+			commErr = GetLastError();
+
+			CloseHandle(hComm);
+			hComm = INVALID_HANDLE_VALUE;
+			return false;
 		}
 	}
 	return true;
@@ -74,7 +81,7 @@ BOOL ws2812::WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
 
 	// Port not opened?
 	if (hComm == INVALID_HANDLE_VALUE)
-		return false;
+		return FALSE;
 
 	// Create this write operation's OVERLAPPED structure's hEvent.
 	osWrite.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -92,7 +99,8 @@ BOOL ws2812::WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
 		}
 		else {
 			// Write is pending.
-			dwRes = WaitForSingleObject(osWrite.hEvent, INFINITE);
+		//	dwRes = WaitForSingleObject(osWrite.hEvent, INFINITE);
+			dwRes = WaitForSingleObject(osWrite.hEvent, 1000);
 			switch (dwRes)
 			{
 				// OVERLAPPED structure's event has been signaled. 
@@ -105,6 +113,7 @@ BOOL ws2812::WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
 				break;
 
 			default:
+			case WAIT_TIMEOUT:
 				// An error has occurred in WaitForSingleObject.
 				// This usually indicates a problem with the
 				// OVERLAPPED structure's event handle.
@@ -193,6 +202,51 @@ void ws2812::OutputTest(const audio_sample *psample, unsigned int samples, audio
 		buffer[i] = 0;
 }
 
+enum led_mode ws2812::GetLedMode(unsigned int startLed, unsigned int ledDir)
+{
+	enum led_mode	result = ws2812_led_mode_top_left_common;
+
+	if (ledDir == 0) {
+		// common direction
+		switch (startLed)
+		{
+		default:
+		case 0:
+			result = ws2812_led_mode_top_left_common;
+			break;
+		case 1:
+			result = ws2812_led_mode_top_right_common;
+			break;
+		case 2:
+			result = ws2812_led_mode_bottom_left_common;
+			break;
+		case 3:
+			result = ws2812_led_mode_bottom_right_common;
+			break;
+		}
+	}
+	else {
+		// alternating direction
+		switch (startLed)
+		{
+		default:
+		case 0:
+			result = ws2812_led_mode_top_left_alternating;
+			break;
+		case 1:
+			result = ws2812_led_mode_top_right_alternating;
+			break;
+		case 2:
+			result = ws2812_led_mode_bottom_left_alternating;
+			break;
+		case 3:
+			result = ws2812_led_mode_bottom_right_alternating;
+			break;
+		}
+	}
+	return result;
+}
+
 unsigned int ws2812::LedIndex(unsigned int row, unsigned int col)
 {
 	unsigned int	result = 0;
@@ -242,6 +296,39 @@ void ws2812::CalcColorWhiteBar(unsigned int row, audio_sample sample, unsigned i
 		// between
 		r = g = b = 255 / 4;
 	}
+}
+
+void ws2812::CalcColor(audio_sample sample, audio_sample min, unsigned int &r, unsigned int &g, unsigned int &b)
+{
+	audio_sample	r_start, g_start, b_start;
+	audio_sample	r_end, g_end, b_end;
+
+	// green
+	r_start = 0; g_start = 200; b_start = 0;
+	// to red
+	r_end = 255; g_end = 0; b_end = 0;
+
+	// row = 0 to (rows - 1) => black to green to red via yellow
+	if (sample <= 0.0) {
+		r_end = 0;
+		g_end = 0;
+		b_end = 0;
+	}
+	else if (sample <= min) {
+		r_end = r_start * (sample / min);
+		g_end = g_start * (sample / min);
+		b_end = b_start * (sample / min);
+	}
+	else if (sample < 1.0) {
+		// scale min .. sample to 0.0 .. 1.0
+		sample = (sample - min) / (1.0 - min);
+		r_end = sample * (r_end - r_start) + r_start;
+		g_end = sample * (g_end - g_start) + g_start;
+		b_end = sample * (b_end - b_start) + b_start;
+	}
+	r = (unsigned int)r_end;
+	g = (unsigned int)g_end;
+	b = (unsigned int)b_end;
 }
 
 void ws2812::CalcRowColor(audio_sample row, unsigned int &r, unsigned int &g, unsigned int &b)
@@ -364,26 +451,32 @@ void ws2812::CalcColor(unsigned int row, audio_sample sample, unsigned int &r, u
 	}
 }
 
-void ws2812::CalcPersistence(unsigned int &c, unsigned int &p_c)
+void ws2812::CalcPersistenceMax(unsigned int &c, unsigned int &p_c)
 {
 	if (c >= p_c) {
 		p_c = c;
 	}
 	else {
-		if (0) {
-			c += p_c;	// lots of flicker...
-			if (c > 255)
-				c = 255;
-		}
-		else {
-			if (c < p_c)
-				c = p_c;
-		}
+		if (c < p_c)
+			c = p_c;
 		p_c /= 2;
 	}
 }
 
-void ws2812::AddPersistence(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b)
+void ws2812::CalcPersistenceAdd(unsigned int &c, unsigned int &p_c)
+{
+	if (c >= p_c) {
+		p_c = c;
+	}
+	else {
+		c += p_c;
+		if (c > 255)
+			c = 255;
+		p_c /= 2;
+	}
+}
+
+void ws2812::AddPersistenceSpectrum(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b)
 {
 	unsigned int	p_r, p_g, p_b;
 
@@ -391,24 +484,42 @@ void ws2812::AddPersistence(unsigned int led_index, unsigned int &r, unsigned in
 	p_g = persistenceBuffer[3 * led_index + 1];
 	p_b = persistenceBuffer[3 * led_index + 2];
 
-	CalcPersistence(r, p_r);
-	CalcPersistence(g, p_g);
-	CalcPersistence(b, p_b);
+	CalcPersistenceMax(r, p_r);
+	CalcPersistenceMax(g, p_g);
+	CalcPersistenceMax(b, p_b);
 
 	persistenceBuffer[3 * led_index + 0] = p_r;
 	persistenceBuffer[3 * led_index + 1] = p_g;
 	persistenceBuffer[3 * led_index + 2] = p_b;
 }
 
-void ws2812::ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned int &g, unsigned int &b)
+void ws2812::AddPersistenceOscilloscope(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b)
 {
-	// apply brightness
-	r = (r * brightness) / 255;
-	g = (g * brightness) / 255;
-	b = (b * brightness) / 255;
+	unsigned int	p_r, p_g, p_b;
+
+	p_r = persistenceBuffer[3 * led_index + 0];
+	p_g = persistenceBuffer[3 * led_index + 1];
+	p_b = persistenceBuffer[3 * led_index + 2];
+
+	CalcPersistenceAdd(r, p_r);
+	CalcPersistenceAdd(g, p_g);
+	CalcPersistenceAdd(b, p_b);
+
+	persistenceBuffer[3 * led_index + 0] = p_r;
+	persistenceBuffer[3 * led_index + 1] = p_g;
+	persistenceBuffer[3 * led_index + 2] = p_b;
 }
 
-void ws2812::LedToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b)
+
+void ws2812::ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned int &g, unsigned int &b)
+{
+	// brightness 0...100
+	r = (r * brightness) / 100;
+	g = (g * brightness) / 100;
+	b = (b * brightness) / 100;
+}
+
+void ws2812::ColorsToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b)
 {
 	// all values < 2 are replaced by 0 (1 is reserved for start of block)
 	if (r < 2)	r = 0;
@@ -432,7 +543,7 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 	unsigned int	sample_index;
 	unsigned int	led_index;
 	unsigned int	r, g, b;
-	unsigned int	bright = (255 * this->brightness) / 100;
+	unsigned int	bright =this->brightness;
 	enum line_style	line_style = this->lineStyle;
 	audio_sample	sum;
 	audio_sample	sample;
@@ -628,54 +739,358 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 		default:
 		case ws2812_spectrum_simple:		// simple white bars
 			for (row = 1; row <= rows; row++) {
-				// led order: start is top left
+				// invert Y axis: y = rows - row
 				led_index = LedIndex(rows - row, bar);
 
 				CalcColorWhiteBar(row, sample, r, g, b);
 
-				AddPersistence(led_index, r, g, b);
+				AddPersistenceSpectrum(led_index, r, g, b);
 
 				ApplyBrightness(bright, r, g, b);
 
-				LedToBuffer(buffer, led_index, r, g, b);
+				ColorsToBuffer(buffer, led_index, r, g, b);
 			}
 			break;
 
 		case ws2812_spectrum_green_red_bars:		// from green to red, each row a single color
 			for (row = 1; row <= rows; row++) {
-				// led order: start is top left
+				// invert Y axis: y = rows - row
 				led_index = LedIndex(rows - row, bar);
 
 				CalcColorColoredRows(row, sample, r, g, b);
 
-				AddPersistence(led_index, r, g, b);
+				AddPersistenceSpectrum(led_index, r, g, b);
 
 				ApplyBrightness(bright, r, g, b);
 
-				LedToBuffer(buffer, led_index, r, g, b);
+				ColorsToBuffer(buffer, led_index, r, g, b);
 			}
 			break;
 
 		case ws2812_spectrum_fire_lines:		// fire style: from green to red the whole bar a single color
 			for (row = 1; row <= rows; row++) {
-				// led order: start is top left
+				// invert Y axis: y = rows - row
 				led_index = LedIndex(rows - row, bar);
 
 				CalcColorColoredBars(row, sample, r, g, b);
 
-				AddPersistence(led_index, r, g, b);
+				AddPersistenceSpectrum(led_index, r, g, b);
 
 				ApplyBrightness(bright, r, g, b);
 
-				LedToBuffer(buffer, led_index, r, g, b);
+				ColorsToBuffer(buffer, led_index, r, g, b);
 			}
 			break;
 		}
 	}
+}
 
-	// clear the rest of the buffer
-//	for (; i < 3 * rows * cols; i++)
-//		buffer[i] = 0;
+void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer)
+{
+	unsigned int	rows = this->rows;
+	unsigned int	cols = this->columns;
+	unsigned int	bar, cnt, row, col;
+	unsigned int	bar_cnt;
+	unsigned int	samples_per_bar;
+	unsigned int	sample_index;
+	unsigned int	led_index;
+	unsigned int	r, g, b;
+	unsigned int	bright = this->brightness;
+	audio_sample	sum;
+	audio_sample	sample;
+	audio_sample	m, n, min;
+	audio_sample	db_max;
+	audio_sample	db_min;
+	double			log_mult;
+	double			bar_freq;
+
+	// move current image one col to the left
+	for (col = 0; col < cols - 1; col++) {
+		for (row = 0; row < rows; row++) {
+			// new col
+			led_index = LedIndex(row, col);
+			// old col
+			sample_index = LedIndex(row, col + 1);
+
+			// copy colors
+			buffer[3 * led_index + 0] = buffer[3 * sample_index + 0];
+			buffer[3 * led_index + 1] = buffer[3 * sample_index + 1];
+			buffer[3 * led_index + 2] = buffer[3 * sample_index + 2];
+		}
+	}
+
+	// new values added in the last col (right)
+	col = cols - 1;
+
+	// horizontal bars
+	bar_cnt = rows;
+
+	// limits
+	db_max = -5;
+	db_min = -40;
+
+	m = (audio_sample)1.0 / (db_max - db_min);
+	n = (audio_sample)1.0 - db_max * m;
+	min = (audio_sample)0.5;
+
+	// multiple samples added together for one bar
+	samples_per_bar = samples / bar_cnt;
+	if (samples_per_bar < 1) {
+		bar_cnt = samples;
+		samples_per_bar = 1;
+	}
+
+	// fixed peak value
+	peak = (audio_sample)(1.0 * samples_per_bar);
+
+
+	// first bar includes samples up to 50 Hz
+	bar_freq = 50;
+
+	//	log_mult = log10(samples);
+	//	log_mult /= (double)bar_cnt;
+	log_mult = delta_f * (audio_sample)samples;
+	log_mult /= bar_freq;
+	// nth root of max_freq/min_freq, where n is the count of bars
+	log_mult = pow(log_mult, 1.0 / bar_cnt);
+
+	sample_index = 0;
+	for (bar = 0; bar < bar_cnt; bar++) {
+		if (logFrequency == false) {
+			// linear frequency scaling
+
+			if (bar == (bar_cnt - 1)) {
+				// last bar -> remaining samples
+				samples_per_bar = samples - sample_index;
+			}
+			else {
+				// prevent index overflow
+				if ((sample_index + samples_per_bar) >= samples)
+					samples_per_bar = samples - sample_index;
+			}
+
+			if (peakValues == false) {
+				// calc mean value of samples per bar
+				sum = 0;
+				for (cnt = 0; cnt < samples_per_bar; cnt++) {
+					sample = psample[sample_index + cnt];
+					sum += fabs(sample);
+				}
+
+				if (logAmplitude) {
+					// calc ratio to peak, logarithmic scale: volts to db
+					sample = 20 * log10(sum / peak);
+				}
+				else {
+					// calc ratio to peak, linear scale
+					sample = (sum / peak) * (db_max - db_min) + db_min;
+				}
+			}
+			else {
+				// find peak value of samples per bar
+				sum = 0;
+				for (cnt = 0; cnt < samples_per_bar; cnt++) {
+					sample = psample[sample_index + cnt];
+					sample = fabs(sample);
+					if (sum < sample)
+						sum = sample;
+				}
+
+				if (logAmplitude) {
+					// logarithmic scale: volts to db
+					sample = 20 * log10(sum);
+				}
+				else {
+					// linear scale
+					sample = sum * (db_max - db_min) + db_min;
+				}
+			}
+			sample_index += samples_per_bar;
+		}
+		else {
+			// logarithmic frequency scaling
+			// number of samples per bar depends on bar index
+			//	if (bar == 0) {
+			//		// first bar -> everthing up to 50 Hz
+			//		samples_per_bar = (unsigned int)(50 / delta_f);
+			//		if (samples_per_bar < 1)
+			//			samples_per_bar = 1;
+			//	}
+			//	else
+			if (bar == (bar_cnt - 1)) {
+				// last bar -> remaining samples
+				if (samples > sample_index)
+					samples_per_bar = samples - sample_index;
+				else
+					samples_per_bar = 0;
+			}
+			else {
+				double	tmp;
+
+				// calc start sample index of the following bar
+				//	tmp = log_mult * (double)(bar + 1);
+				//	tmp = pow(10, tmp);
+				//	tmp = 50 * pow(log_mult, bar) / delta_f;
+				tmp = ceil(bar_freq / delta_f);
+
+				// count of samples to the next index
+				if (tmp <= (double)sample_index)
+					samples_per_bar = 0;
+				else
+					samples_per_bar = (unsigned int)tmp - sample_index;
+
+				// minimum sample count (trial and error, should depend somehow on the max fft frequency...)
+				if (samples_per_bar < 1)
+					samples_per_bar = 1;
+
+				// prevent index overflow
+				if (sample_index >= samples)
+					samples_per_bar = 0;
+				else if ((sample_index + samples_per_bar) >= samples)
+					samples_per_bar = samples - sample_index;
+			}
+
+			if (peakValues == false) {
+				// calc mean value of samples per bar
+				sum = 0;
+				for (cnt = 0; cnt < samples_per_bar; cnt++) {
+					sample = psample[sample_index + cnt];
+					sum += fabs(sample);
+				}
+
+				if (logAmplitude) {
+					// calc ratio to peak, logarithmic scale: volts to db
+					sample = 20 * log10(sum / peak);
+				}
+				else {
+					// calc ratio to peak, linear scale
+					sample = (sum / peak) * (db_max - db_min) + db_min;
+				}
+			}
+			else {
+				// find peak value of samples per bar
+				sum = 0;
+				for (cnt = 0; cnt < samples_per_bar; cnt++) {
+					sample = psample[sample_index + cnt];
+					sample = fabs(sample);
+					if (sum < sample)
+						sum = sample;
+				}
+
+				if (logAmplitude) {
+					// logarithmic scale: volts to db
+					sample = 20 * log10(sum);
+				}
+				else {
+					// linear scale
+					sample = sum * (db_max - db_min) + db_min;
+				}
+			}
+			sample_index += samples_per_bar;
+		}
+		// increase max frequency for the next bar
+		bar_freq *= log_mult;
+
+		// calc height of bar in rows
+		// -10 db is max, -80 is min
+		// -10 db is 1.0, -80 is 0
+		if (sample >= db_max) {
+			// limit
+			sample = 1.0;
+		}
+		else {
+			sample = sample * m + n;
+		}
+
+		CalcColor(sample, min, r, g, b);
+
+		// invert Y axis
+		row = bar_cnt - 1 - bar;
+		led_index = LedIndex(row, col);
+
+		ApplyBrightness(bright, r, g, b);
+
+		ColorsToBuffer(buffer, led_index, r, g, b);
+	}
+}
+
+void ws2812::OutputOscilloscope(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer)
+{
+	unsigned int	rows = this->rows;
+	unsigned int	cols = this->columns;
+	unsigned int	col, row;
+	unsigned int	sample_index;
+	unsigned int	led_index;
+	unsigned int	r, g, b;
+	unsigned int	bright = this->brightness;
+	unsigned int	max_cnt;
+	audio_sample	sample;
+	audio_sample	val_per_row;
+	audio_sample	val_max;
+	audio_sample	val_min;
+	unsigned int	max_wfm;
+
+	// scale waveform
+	val_max = 1.0;
+	val_min = -1.0;
+	val_per_row = (val_max - val_min) / (audio_sample)rows;
+
+	// clear counters
+	ZeroMemory(counterBuffer, bufferSize * sizeof(unsigned int));
+
+	max_wfm = 20;
+	row = 0;
+	col = 0;
+	max_cnt = 1;
+	for (sample_index = 0; sample_index < samples; sample_index++) {
+		sample = psample[sample_index];
+
+		// sample to row
+		sample = sample / val_per_row;
+		// center in Y
+		sample += rows / 2;
+
+		// invert Y axis
+		sample += 1;
+		if (sample > 0)
+			row = rows - (unsigned int)floor(sample);
+		else
+			row = rows / 2;
+
+		led_index = LedIndex(row, col);
+
+		// sum of all hits of this pixel
+		counterBuffer[led_index] += 1;
+
+		// update max count for brightness calculation
+		if (max_cnt < counterBuffer[led_index])
+			max_cnt = counterBuffer[led_index];
+
+		// one samples per row, multiple chunks overlapped
+		col++;
+		if (col >= cols) {
+			col = 0;
+
+			// limit max overlapped waveforms
+			if (max_wfm > 0)
+				max_wfm--;
+			else
+				break;
+		}
+	}
+
+	// convert sample counts to brightness
+	for (led_index = 0; led_index < rows * cols; led_index++) {
+		// shades of white, for a start
+		r = (counterBuffer[led_index] * 255) / max_cnt;
+		g = b = r;
+
+		AddPersistenceOscilloscope(led_index, r, g, b);
+
+		ApplyBrightness(bright, r, g, b);
+
+		ColorsToBuffer(buffer, led_index, r, g, b);
+	}
 }
 
 void ws2812::CalcAndOutput(void)
@@ -685,38 +1100,109 @@ void ws2812::CalcAndOutput(void)
 	// get current track time
 	if (visStream->get_absolute_time(abs_time)) {
 		audio_chunk_fast_impl	chunk;
-		unsigned int			fft_size = fftSize;
 
-		// FFT data
-		if (visStream->get_spectrum_absolute(chunk, abs_time, fft_size)) {
-			// number of channels, should be 1
-			unsigned int	channels = chunk.get_channel_count();
-			// number of samples in the chunk, fft_size / 2
-			int				samples = chunk.get_sample_count();
-			unsigned int	sample_rate = chunk.get_sample_rate();
-			// peak sample value
-			audio_sample	peak = 1.0;	// chunk.get_peak();
-			audio_sample	delta_f = (audio_sample)sample_rate / (audio_sample)fft_size;
+		if (lineStyle == ws2812_oscilloscope) {
+			// length of audio data
+			double		length = (double)timerInterval * 1e-3;	//audioLength;
 
-			// convert samples
-			const audio_sample *psample = chunk.get_data();
-			if (outputBuffer != nullptr && psample != nullptr && samples > 0) {
-				// a value of 1 is used as start byte
-				// and must not occur in other bytes in the buffer
-				outputBuffer[0] = 1;
+			// audio data
+			if (visStream->get_chunk_absolute(chunk, abs_time, length)) {
+				// number of channels, should be 1
+				unsigned int	channels = chunk.get_channel_count();
+				// number of samples in the chunk, fft_size / 2
+				int				samples = chunk.get_sample_count();
+				unsigned int	sample_rate = chunk.get_sample_rate();
+				// peak sample value
+				audio_sample	peak = 1.0;	//chunk.get_peak();
 
-				OutputSpectrumBars(psample, samples, peak, delta_f, &outputBuffer[1]);
+				// convert samples
+				const audio_sample *psample = chunk.get_data();
+				if (outputBuffer != nullptr && psample != nullptr && samples > 0) {
+					// a value of 1 is used as start byte
+					// and must not occur in other bytes in the buffer
+					outputBuffer[0] = 1;
 
-				// send buffer
-				WriteABuffer(outputBuffer, bufferSize);
+					OutputOscilloscope(psample, samples, peak, &outputBuffer[1]);
 
+					// send buffer
+					WriteABuffer(outputBuffer, bufferSize);
+
+				}
+				else {
+					// no samples ?
+				}
 			}
 			else {
-				// no samples ?
+				// no audio data ?
+			}
+		}
+		else if (lineStyle == ws2812_spectrogram) {
+			unsigned int			fft_size = fftSize;
+
+			// spectrum data
+			if (visStream->get_spectrum_absolute(chunk, abs_time, fft_size)) {
+				// number of channels, should be 1
+				unsigned int	channels = chunk.get_channel_count();
+				// number of samples in the chunk, fft_size / 2
+				int				samples = chunk.get_sample_count();
+				unsigned int	sample_rate = chunk.get_sample_rate();
+				// peak sample value
+				audio_sample	peak = 1.0;	// chunk.get_peak();
+				audio_sample	delta_f = (audio_sample)sample_rate / (audio_sample)fft_size;
+
+				// convert samples
+				const audio_sample *psample = chunk.get_data();
+				if (outputBuffer != nullptr && psample != nullptr && samples > 0) {
+					// a value of 1 is used as start byte
+					// and must not occur in other bytes in the buffer
+					outputBuffer[0] = 1;
+
+					OutputSpectrogram(psample, samples, peak, delta_f, &outputBuffer[1]);
+
+					// send buffer
+					WriteABuffer(outputBuffer, bufferSize);
+				}
+				else {
+					// no samples ?
+				}
+			}
+			else {
+				// no spectrum data ?
 			}
 		}
 		else {
-			// no FFT data ?
+			unsigned int			fft_size = fftSize;
+
+			// spectrum data
+			if (visStream->get_spectrum_absolute(chunk, abs_time, fft_size)) {
+				// number of channels, should be 1
+				unsigned int	channels = chunk.get_channel_count();
+				// number of samples in the chunk, fft_size / 2
+				int				samples = chunk.get_sample_count();
+				unsigned int	sample_rate = chunk.get_sample_rate();
+				// peak sample value
+				audio_sample	peak = 1.0;	// chunk.get_peak();
+				audio_sample	delta_f = (audio_sample)sample_rate / (audio_sample)fft_size;
+
+				// convert samples
+				const audio_sample *psample = chunk.get_data();
+				if (outputBuffer != nullptr && psample != nullptr && samples > 0) {
+					// a value of 1 is used as start byte
+					// and must not occur in other bytes in the buffer
+					outputBuffer[0] = 1;
+
+					OutputSpectrumBars(psample, samples, peak, delta_f, &outputBuffer[1]);
+
+					// send buffer
+					WriteABuffer(outputBuffer, bufferSize);
+				}
+				else {
+					// no samples ?
+				}
+			}
+			else {
+				// no spectrum data ?
+			}
 		}
 	}
 	else {
@@ -778,7 +1264,7 @@ bool ws2812::ToggleOutput(void)
 		if (timerStarted == false) {
 			if (OpenPort(NULL, comPort)) {
 				if (StartTimer()) {
-
+					// okay
 				}
 				else {
 					popup_message::g_show("Start timer failed!", "WS2812 Output", popup_message::icon_error);
@@ -838,7 +1324,7 @@ void ws2812::ConfigMatrix(int rows, int cols, enum start_led start_led, enum led
 			persistenceBuffer = nullptr;
 
 			// 240 LEDs, RGB for each, plus one start byte
-			initDone = CreateBuffer();
+			initDone = AllocateBuffers();
 			if (initDone) {
 				if (timerRunning) {
 					StartTimer();
@@ -880,8 +1366,13 @@ void SetLineStyle(unsigned int lineStyle)
 
 void ws2812::SetLineStyle(enum line_style style)
 {
-	if (style >= 0 && style < ws2812_line_style_no)
+	if (style >= 0 && style < ws2812_line_style_no) {
 		this->lineStyle = style;
+
+		// changing style from spectrum to oscilloscope
+		// will result in strange images if the persistence buffer is not cleared
+		ClearPersistence();
+	}
 }
 
 void SetBrightness(unsigned int brightness)
@@ -955,18 +1446,44 @@ void ws2812::SetInterval(unsigned int interval)
 	}
 }
 
-bool ws2812::CreateBuffer()
+bool ws2812::AllocateBuffers()
 {
 	bufferSize = 1 + 3 * rows * columns;
-	outputBuffer = new unsigned char[bufferSize];
-	persistenceBuffer = new unsigned char[bufferSize];
 
-	if (outputBuffer && persistenceBuffer) {
-		ZeroMemory(outputBuffer, bufferSize);
-		ZeroMemory(persistenceBuffer, bufferSize);
+	outputBuffer		= new unsigned char[bufferSize];
+	persistenceBuffer	= new unsigned char[bufferSize];
+	counterBuffer		= new unsigned int[bufferSize];
+
+	if (outputBuffer && persistenceBuffer && counterBuffer) {
+		ZeroMemory(outputBuffer,		bufferSize * sizeof(unsigned char));
+		ZeroMemory(persistenceBuffer,	bufferSize * sizeof(unsigned char));
+		ZeroMemory(counterBuffer,		bufferSize * sizeof(unsigned int));
+
 		return true;
 	}
 	return false;
+}
+
+void ws2812::FreeBuffers()
+{
+	if (outputBuffer)
+		delete outputBuffer;
+	outputBuffer = nullptr;
+
+	if (persistenceBuffer)
+		delete persistenceBuffer;
+	persistenceBuffer = nullptr;
+
+	if (counterBuffer)
+		delete counterBuffer;
+	counterBuffer = nullptr;
+}
+
+
+void ws2812::ClearPersistence(void)
+{
+	if (persistenceBuffer)
+		ZeroMemory(persistenceBuffer, bufferSize);
 }
 
 
@@ -978,6 +1495,9 @@ ws2812::ws2812()
 	bufferSize = 0;
 	outputBuffer = nullptr;
 	persistenceBuffer = nullptr;
+	counterBuffer = nullptr;
+	timerStarted = false;
+	initDone = false;
 
 	// ask the global visualisation manager to create a stream for us
 	static_api_ptr_t<visualisation_manager>()->create_stream(visStream, visualisation_manager::KStreamFlagNewFFT);
@@ -1018,8 +1538,18 @@ ws2812::ws2812()
 		logAmplitude = GetCfgLogAmplitude() != 0;
 		peakValues = GetCfgPeakValues() != 0;
 
-		// 240 LEDs, RGB for each, plus one start byte
-		initDone = CreateBuffer();
+		ledMode = GetLedMode(GetCfgStartLed(), GetCfgLedDirection());
+
+		timerStartDelay = 500;
+
+		// fast FFT
+		fftSize = 8 * 1024;
+
+		// oscilloscope display time
+		audioLength = 10 * 1e-3;
+
+		// allocate output buffer
+		initDone = AllocateBuffers();
 	}
 }
 
@@ -1030,6 +1560,9 @@ ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, unsigned
 	bufferSize = 0;
 	outputBuffer = nullptr;
 	persistenceBuffer = nullptr;
+	counterBuffer = nullptr;
+	timerStarted = false;
+	initDone = false;
 
 	// ask the global visualisation manager to create a stream for us
 	static_api_ptr_t<visualisation_manager>()->create_stream(visStream, visualisation_manager::KStreamFlagNewFFT);
@@ -1071,8 +1604,18 @@ ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, unsigned
 		logAmplitude = true;
 		peakValues = true;
 
-		// 240 LEDs, RGB for each, plus one start byte
-		initDone = CreateBuffer();
+		ledMode = GetLedMode(0, 0);
+
+		timerStartDelay = 500;
+
+		// fast FFT
+		fftSize = 8 * 1024;
+
+		// oscilloscope display time
+		audioLength = 10 * 1e-3;
+
+		// allocate output buffer
+		initDone = AllocateBuffers();
 	}
 }
 
@@ -1089,13 +1632,7 @@ ws2812::~ws2812()
 	// close the COM port
 	ClosePort();
 
-	if (outputBuffer)
-		delete outputBuffer;
-	outputBuffer = nullptr;
-
-	if (persistenceBuffer)
-		delete persistenceBuffer;
-	persistenceBuffer = nullptr;
+	FreeBuffers();
 }
 
 void InitOutput()

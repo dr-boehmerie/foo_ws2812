@@ -20,12 +20,16 @@ enum start_led
 	ws2812_top_right,
 	ws2812_bottom_left,
 	ws2812_bottom_right,
+
+	ws2812_start_led_no
 };
 
 enum led_direction
 {
 	ws2812_led_dir_common = 0,
 	ws2812_led_dir_alternating,
+
+	ws2812_led_dir_no
 };
 
 enum led_mode
@@ -38,6 +42,8 @@ enum led_mode
 	ws2812_led_mode_bottom_left_alternating,
 	ws2812_led_mode_bottom_right_common,
 	ws2812_led_mode_bottom_right_alternating,
+
+	ws2812_led_mode_no
 };
 
 class ws2812
@@ -64,25 +70,34 @@ public:
 	bool StopOutput(void);
 	bool ToggleOutput(void);
 
+	void ClearPersistence(void);
+
 private:
 	BOOL OpenPort(LPCWSTR gszPort, unsigned int port);
 	BOOL ClosePort();
 	BOOL WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite);
-	bool CreateBuffer();
+	bool AllocateBuffers();
+	void FreeBuffers();
 
 	unsigned int LedIndex(unsigned int row, unsigned int col);
+	enum led_mode GetLedMode(unsigned int startLed, unsigned int ledDir);
 	void CalcColorWhiteBar(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
+	void CalcColor(audio_sample sample, audio_sample min, unsigned int &r, unsigned int &g, unsigned int &b);
 	void CalcRowColor(audio_sample row, unsigned int &r, unsigned int &g, unsigned int &b);
 	void CalcColorColoredRows(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
 	void CalcColorColoredBars(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
 	void CalcColor(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
-	void CalcPersistence(unsigned int &c, unsigned int &p_c);
-	void AddPersistence(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
+	void CalcPersistenceMax(unsigned int &c, unsigned int &p_c);
+	void CalcPersistenceAdd(unsigned int &c, unsigned int &p_c);
+	void AddPersistenceSpectrum(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
+	void AddPersistenceOscilloscope(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
 	void ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned int &g, unsigned int &b);
-	void LedToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
+	void ColorsToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
 
 	void OutputTest(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer, unsigned int bufferSize);
 	void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer);
+	void OutputSpectrogram(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer);
+	void OutputOscilloscope(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer);
 
 public:
 	const unsigned int	rows_min = 1;
@@ -118,6 +133,7 @@ private:
 	bool				peakValues;
 
 	unsigned int		fftSize;
+	double				audioLength;
 
 	DWORD				timerStartDelay;
 	DWORD				timerInterval;
@@ -134,6 +150,7 @@ private:
 	unsigned int		bufferSize;
 	unsigned char		*outputBuffer;
 	unsigned char		*persistenceBuffer;
+	unsigned int		*counterBuffer;
 
 	service_ptr_t<visualisation_stream_v3>	visStream;
 };

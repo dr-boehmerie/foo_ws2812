@@ -57,14 +57,18 @@ enum {
 	default_cfg_bogoSetting3 = 42,
 };
 
+// TODO language dependend strings, number of entries should depend on enum start_led
 LPCTSTR		cfg_startLedStr[4] = { L"Top Left", L"Top Right", L"Bottom Left", L"Bottom Right" };
 LRESULT		cfg_startLedId[4];
 
+// TODO number of entries should depend on enum led_dir
 LPCTSTR		cfg_ledDirStr[2] = { L"Common", L"Alternating" };
 LRESULT		cfg_ledDirId[2];
 
-LPCTSTR		cfg_lineStyleStr[3] = { L"Simple", L"Green/Red", L"Fire" };
-LRESULT		cfg_lineStyleId[3];
+// TODO number of entries should depend on enum line_style
+LPCTSTR		cfg_lineStyleStr[5] = { L"Simple", L"Green/Red", L"Fire", L"Spectrogram", L"Oscilloscpe" };
+LRESULT		cfg_lineStyleId[5];
+
 
 static cfg_uint cfg_matrixRows(guid_cfg_matrixRows, default_cfg_matrixRows);
 static cfg_uint cfg_matrixCols(guid_cfg_matrixCols, default_cfg_matrixCols);
