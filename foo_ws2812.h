@@ -1,5 +1,11 @@
 #pragma once
 
+#define CALC_TAB_ELEMENTS(_TAB_)	(sizeof(_TAB_)/sizeof(_TAB_[0]))
+
+#define MAKE_COLOR(_R_,_G_,_B_)		((((_R_) & 0xFF) << 16) | (((_G_) & 0xFF) << 8) | ((_B_) & 0xFF))
+#define GET_COLOR_R(_RGB_)			(((_RGB_) >> 16) & 0xFF)
+#define GET_COLOR_G(_RGB_)			(((_RGB_) >> 8) & 0xFF)
+#define GET_COLOR_B(_RGB_)			((_RGB_) & 0xFF)
 
 enum line_style
 {
@@ -7,7 +13,8 @@ enum line_style
 	ws2812_spectrum_green_red_bars,
 	ws2812_spectrum_fire_lines,
 
-	ws2812_spectrogram,
+	ws2812_spectrogram_horizontal,
+	ws2812_spectrogram_vertical,
 
 	ws2812_oscilloscope,
 
@@ -71,6 +78,10 @@ public:
 	bool ToggleOutput(void);
 
 	void ClearPersistence(void);
+	void ClearOutputBuffer(void);
+
+	void InitColorTab(void);
+	void InitColorTab(const unsigned int *initTab, unsigned int tabElements);
 
 private:
 	BOOL OpenPort(LPCWSTR gszPort, unsigned int port);
@@ -120,9 +131,14 @@ public:
 	const unsigned int	timerInterval_max = 1000;
 	const unsigned int	timerInterval_def = 330;
 
+	const unsigned int	spectrumColorTab[2] = { MAKE_COLOR(0, 255, 0), MAKE_COLOR(0, 255, 0) };
+	const unsigned int	spectrogramColorTab[4] = { MAKE_COLOR(0, 0, 0), MAKE_COLOR(0, 0, 127), MAKE_COLOR(0, 200, 0), MAKE_COLOR(255, 0, 0) };
+	const unsigned int	oscilloscopeColorTab[2] = { MAKE_COLOR(0, 0, 0), MAKE_COLOR(255, 255, 255)};
+
 private:
 	unsigned int		rows;
 	unsigned int		columns;
+	unsigned int		ledNo;
 
 	unsigned int		brightness;
 	enum led_mode		ledMode;
@@ -151,6 +167,11 @@ private:
 	unsigned char		*outputBuffer;
 	unsigned char		*persistenceBuffer;
 	unsigned int		*counterBuffer;
+
+	unsigned int		*indexLut;
+
+	const unsigned int	colorNo = 1000;
+	unsigned int		*colorTab;
 
 	service_ptr_t<visualisation_stream_v3>	visStream;
 };

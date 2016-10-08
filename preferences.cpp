@@ -5,7 +5,6 @@
 
 #include "foo_ws2812.h"
 
-#define CALC_TAB_ELEMENTS(_TAB_)	(sizeof(_TAB_)/sizeof(_TAB_[0]))
 
 // These GUIDs identify the variables within our component's configuration file.
 // {FDCD346D-3B1B-413C-9CAE-3A221AA6993B}
@@ -58,16 +57,16 @@ enum {
 };
 
 // TODO language dependend strings, number of entries should depend on enum start_led
-LPCTSTR		cfg_startLedStr[4] = { L"Top Left", L"Top Right", L"Bottom Left", L"Bottom Right" };
-LRESULT		cfg_startLedId[4];
+LPCTSTR		cfg_startLedStr[ws2812_start_led_no] = { L"Top Left", L"Top Right", L"Bottom Left", L"Bottom Right" };
+LRESULT		cfg_startLedId[ws2812_start_led_no];
 
 // TODO number of entries should depend on enum led_dir
-LPCTSTR		cfg_ledDirStr[2] = { L"Common", L"Alternating" };
-LRESULT		cfg_ledDirId[2];
+LPCTSTR		cfg_ledDirStr[ws2812_led_dir_no] = { L"Common", L"Alternating" };
+LRESULT		cfg_ledDirId[ws2812_led_dir_no];
 
 // TODO number of entries should depend on enum line_style
-LPCTSTR		cfg_lineStyleStr[5] = { L"Simple", L"Green/Red", L"Fire", L"Spectrogram", L"Oscilloscpe" };
-LRESULT		cfg_lineStyleId[5];
+LPCTSTR		cfg_lineStyleStr[ws2812_line_style_no] = { L"Simple", L"Green/Red", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe" };
+LRESULT		cfg_lineStyleId[ws2812_line_style_no];
 
 
 static cfg_uint cfg_matrixRows(guid_cfg_matrixRows, default_cfg_matrixRows);
@@ -149,7 +148,10 @@ BOOL CMyPreferences::OnInitDialog(CWindow, LPARAM) {
 	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_startLedId); n++) {
 		WCHAR	str[64];
 
-		StrCpy(str, cfg_startLedStr[n]);
+		if (cfg_startLedStr[n])
+			StrCpy(str, cfg_startLedStr[n]);
+		else
+			StrCpy(str, L"?");
 		cfg_startLedId[n] = SendDlgItemMessage(IDC_START_LED, CB_ADDSTRING, 0, (DWORD)str);
 	}
 	SendDlgItemMessage(IDC_START_LED, CB_SETCURSEL, cfg_startLedId[cfg_startLed], 0);
@@ -157,7 +159,10 @@ BOOL CMyPreferences::OnInitDialog(CWindow, LPARAM) {
 	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_ledDirId); n++) {
 		WCHAR	str[64];
 
-		StrCpy(str, cfg_ledDirStr[n]);
+		if (cfg_ledDirStr[n])
+			StrCpy(str, cfg_ledDirStr[n]);
+		else
+			StrCpy(str, L"?");
 		cfg_ledDirId[n] = SendDlgItemMessage(IDC_LED_DIR, CB_ADDSTRING, 0, (DWORD)str);
 	}
 	SendDlgItemMessage(IDC_LED_DIR, CB_SETCURSEL, cfg_ledDirId[cfg_ledDirection], 0);
@@ -165,7 +170,10 @@ BOOL CMyPreferences::OnInitDialog(CWindow, LPARAM) {
 	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_lineStyleId); n++) {
 		WCHAR	str[64];
 
-		StrCpy(str, cfg_lineStyleStr[n]);
+		if (cfg_lineStyleStr[n])
+			StrCpy(str, cfg_lineStyleStr[n]);
+		else
+			StrCpy(str, L"?");
 		cfg_lineStyleId[n] = SendDlgItemMessage(IDC_LINE_STYLE, CB_ADDSTRING, 0, (DWORD)str);
 	}
 	SendDlgItemMessage(IDC_LINE_STYLE, CB_SETCURSEL, cfg_lineStyleId[cfg_lineStyle], 0);
