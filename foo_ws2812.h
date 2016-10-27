@@ -64,11 +64,24 @@ public:
 	void ConfigMatrix(int rows, int cols, enum start_led start_led, enum led_direction led_dir);
 	bool SetComPort(unsigned int port);
 	void CalcAndOutput(void);
+
 	void SetBrightness(unsigned int brightness);
+	void GetBrightness(unsigned int *brightness);
+
 	void SetLineStyle(enum line_style style);
+	void GetLineStyle(unsigned int *style);
+
 	void SetScaling(int logFrequency, int logAmplitude, int peakValues);
+	void GetScaling(int *logFrequency, int *logAmplitude, int *peakValues);
 
 	void SetInterval(unsigned int interval);
+	void GetInterval(unsigned int *interval);
+
+	void SetAmplitudeMinMax(int min, int max);
+	void GetAmplitudeMinMax(int *min, int *max);
+
+	void SetFrequencyMinMax(int min, int max);
+	void GetFrequencyMinMax(int *min, int *max);
 
 	bool StartTimer();
 	bool StopTimer();
@@ -76,9 +89,6 @@ public:
 	bool StartOutput(void);
 	bool StopOutput(void);
 	bool ToggleOutput(void);
-
-	void ClearPersistence(void);
-	void ClearOutputBuffer(void);
 
 	void InitColorTab(void);
 	void InitColorTab(const unsigned int *initTab, unsigned int tabElements);
@@ -89,6 +99,13 @@ private:
 	BOOL WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite);
 	bool AllocateBuffers();
 	void FreeBuffers();
+	void InitAmplitudeMinMax();
+	void InitFrequencyMinMax();
+
+	void ClearPersistence(void);
+	void ClearOutputBuffer(void);
+	void ClearCounterBuffer(void);
+	void ClearLedBuffer(unsigned char *buffer);
 
 	unsigned int LedIndex(unsigned int row, unsigned int col);
 	enum led_mode GetLedMode(unsigned int startLed, unsigned int ledDir);
@@ -111,25 +128,31 @@ private:
 	void OutputOscilloscope(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer);
 
 public:
-	const unsigned int	rows_min = 1;
-	const unsigned int	rows_max = 32;
-	const unsigned int	rows_def = 8;
+	static const unsigned int	rows_min = 1;
+	static const unsigned int	rows_max = 32;
+	static const unsigned int	rows_def = 8;
 
-	const unsigned int	columns_min = 1;
-	const unsigned int	columns_max = 32;
-	const unsigned int	columns_def = 8;
+	static const unsigned int	columns_min = 1;
+	static const unsigned int	columns_max = 32;
+	static const unsigned int	columns_def = 8;
 
-	const unsigned int	port_min = 1;
-	const unsigned int	port_max = 127;
-	const unsigned int	port_def = 3;
+	static const unsigned int	port_min = 1;
+	static const unsigned int	port_max = 127;
+	static const unsigned int	port_def = 3;
 
-	const unsigned int	brightness_min = 0;
-	const unsigned int	brightness_max = 100;
-	const unsigned int	brightness_def = 25;
+	static const unsigned int	brightness_min = 0;
+	static const unsigned int	brightness_max = 66;
+	static const unsigned int	brightness_def = 25;
 
-	const unsigned int	timerInterval_min = 50;
-	const unsigned int	timerInterval_max = 1000;
-	const unsigned int	timerInterval_def = 330;
+	static const unsigned int	timerInterval_min = 50;
+	static const unsigned int	timerInterval_max = 500;
+	static const unsigned int	timerInterval_def = 330;
+
+	static const int			frequency_min = 10;
+	static const int			frequency_max = 22100;
+
+	static const int			amplitude_min = -100;
+	static const int			amplitude_max = 10;
 
 	const unsigned int	spectrumColorTab[2] = { MAKE_COLOR(0, 255, 0), MAKE_COLOR(0, 255, 0) };
 	const unsigned int	spectrogramColorTab[4] = { MAKE_COLOR(0, 0, 0), MAKE_COLOR(0, 0, 127), MAKE_COLOR(0, 200, 0), MAKE_COLOR(255, 0, 0) };
@@ -173,6 +196,12 @@ private:
 	const unsigned int	colorNo = 1000;
 	unsigned int		*colorTab;
 
+	int					freqMin[ws2812_line_style_no];
+	int					freqMax[ws2812_line_style_no];
+
+	int					amplMin[ws2812_line_style_no];
+	int					amplMax[ws2812_line_style_no];
+
 	service_ptr_t<visualisation_stream_v3>	visStream;
 };
 
@@ -190,12 +219,27 @@ void SetScaling(int logFrequency, int logAmplitude, int peakValues);
 void SetLineStyle(unsigned int lineStyle);
 void SetBrightness(unsigned int brightness);
 
+void SetAmplitudeMinMax(int min, int max);
+void SetFrequencyMinMax(int min, int max);
+
 void SetComPort(unsigned int port);
 
 void SetInterval(unsigned int interval);
 
+void GetScaling(int *logFrequency, int *logAmplitude, int *peakValues);
+void GetInterval(unsigned int *interval);
+void GetBrightness(unsigned int *brightness);
+void GetLineStyle(unsigned int *lineStyle);
+
+void GetAmplitudeMinMax(int *min, int *max);
+void GetFrequencyMinMax(int *min, int *max);
+
+
 // playback_state.cpp
 void RunPlaybackStateDemo();
+
+// control_dialog.cpp
+void RunWS2812ControlDialog();
 
 // preferences.cpp
 unsigned int GetCfgComPort();
@@ -210,3 +254,16 @@ unsigned int GetCfgLineStyle();
 unsigned int GetCfgLogFrequency();
 unsigned int GetCfgLogAmplitude();
 unsigned int GetCfgPeakValues();
+
+bool SetCfgComPort(unsigned int value);
+bool SetCfgMatrixRows(unsigned int value);
+bool SetCfgMatrixCols(unsigned int value);
+bool SetCfgBrightness(unsigned int value);
+bool SetCfgUpdateInterval(unsigned int value);
+bool SetCfgStartLed(unsigned int value);
+bool SetCfgLedDirection(unsigned int value);
+
+bool SetCfgLineStyle(unsigned int value);
+bool SetCfgLogFrequency(unsigned int value);
+bool SetCfgLogAmplitude(unsigned int value);
+bool SetCfgPeakValues(unsigned int value);

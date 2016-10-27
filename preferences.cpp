@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "resource.h"
+#include "Windowsx.h"
 
 // Sample preferences interface: two meaningless configuration settings accessible through a preferences page and one accessible through advanced preferences.
 
@@ -86,10 +87,10 @@ static advconfig_branch_factory g_advconfigBranch("WS2812 Output", guid_advconfi
 
 static advconfig_integer_factory cfg_bogoSetting3("Bogo setting 3", guid_cfg_bogoSetting3, guid_advconfig_branch, 0, default_cfg_bogoSetting3, 0 /*minimum value*/, 9999 /*maximum value*/);
 
-class CMyPreferences : public CDialogImpl<CMyPreferences>, public preferences_page_instance {
+class CWS2812Preferences : public CDialogImpl<CWS2812Preferences>, public preferences_page_instance {
 public:
 	//Constructor - invoked by preferences_page_impl helpers - don't do Create() in here, preferences_page_impl does this for us
-	CMyPreferences(preferences_page_callback::ptr callback) : m_callback(callback)
+	CWS2812Preferences(preferences_page_callback::ptr callback) : m_callback(callback)
 	{}
 
 	//Note that we don't bother doing anything regarding destruction of our class.
@@ -104,7 +105,7 @@ public:
 	void reset();
 
 	//WTL message map
-	BEGIN_MSG_MAP(CMyPreferences)
+	BEGIN_MSG_MAP(CWS2812Preferences)
 		MSG_WM_INITDIALOG(OnInitDialog)
 		COMMAND_HANDLER_EX(IDC_MATRIX_ROWS, EN_CHANGE, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_MATRIX_COLS, EN_CHANGE, OnEditChange)
@@ -131,7 +132,7 @@ private:
 
 };
 
-BOOL CMyPreferences::OnInitDialog(CWindow, LPARAM) {
+BOOL CWS2812Preferences::OnInitDialog(CWindow, LPARAM) {
 	SetDlgItemInt(IDC_MATRIX_ROWS, cfg_matrixRows, FALSE);
 	SetDlgItemInt(IDC_MATRIX_COLS, cfg_matrixCols, FALSE);
 	SetDlgItemInt(IDC_BRIGHTNESS, cfg_brightness, FALSE);
@@ -183,23 +184,23 @@ BOOL CMyPreferences::OnInitDialog(CWindow, LPARAM) {
 	return FALSE;
 }
 
-void CMyPreferences::OnEditChange(UINT, int, CWindow) {
+void CWS2812Preferences::OnEditChange(UINT, int, CWindow) {
 	// not much to do here
 	OnChanged();
 }
 
-void CMyPreferences::OnCBChange(UINT, int, CWindow) {
+void CWS2812Preferences::OnCBChange(UINT, int, CWindow) {
 	cbChanged = true;
 	OnChanged();
 }
 
-t_uint32 CMyPreferences::get_state() {
+t_uint32 CWS2812Preferences::get_state() {
 	t_uint32 state = preferences_state::resettable;
 	if (HasChanged()) state |= preferences_state::changed;
 	return state;
 }
 
-void CMyPreferences::reset() {
+void CWS2812Preferences::reset() {
 	SetDlgItemInt(IDC_MATRIX_ROWS, default_cfg_matrixRows, FALSE);
 	SetDlgItemInt(IDC_MATRIX_COLS, default_cfg_matrixCols, FALSE);
 	SetDlgItemInt(IDC_BRIGHTNESS, default_cfg_brightness, FALSE);
@@ -221,7 +222,7 @@ void CMyPreferences::reset() {
 	OnChanged();
 }
 
-void CMyPreferences::apply() {
+void CWS2812Preferences::apply() {
 	bool	isActive;
 	LRESULT	r;
 
@@ -254,6 +255,7 @@ void CMyPreferences::apply() {
 		}
 	}
 	r = SendDlgItemMessage(IDC_LINE_STYLE, CB_GETCURSEL, 0, 0);
+//	r = ComboBox_GetCurSel(IDC_LINE_STYLE);
 	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_lineStyleId); n++) {
 		if (r == cfg_lineStyleId[n]) {
 			cfg_lineStyle = n;
@@ -283,7 +285,7 @@ void CMyPreferences::apply() {
 	OnChanged(); //our dialog content has not changed but the flags have - our currently shown values now match the settings so the apply button can be disabled
 }
 
-bool CMyPreferences::HasChanged() {
+bool CWS2812Preferences::HasChanged() {
 	//returns whether our dialog content is different from the current configuration (whether the apply button should be enabled or not)
 	bool changed = false;
 
@@ -304,12 +306,12 @@ bool CMyPreferences::HasChanged() {
 
 	return changed;
 }
-void CMyPreferences::OnChanged() {
+void CWS2812Preferences::OnChanged() {
 	//tell the host that our state has changed to enable/disable the apply button appropriately.
 	m_callback->on_state_changed();
 }
 
-class preferences_page_myimpl : public preferences_page_impl<CMyPreferences> {
+class preferences_page_ws2812 : public preferences_page_impl<CWS2812Preferences> {
 	// preferences_page_impl<> helper deals with instantiation of our dialog; inherits from preferences_page_v3.
 public:
 	const char * get_name() {return "WS2812 Output";}
@@ -323,7 +325,7 @@ public:
 	GUID get_parent_guid() {return guid_tools;}
 };
 
-static preferences_page_factory_t<preferences_page_myimpl> g_preferences_page_myimpl_factory;
+static preferences_page_factory_t<preferences_page_ws2812> g_preferences_page_ws2812_factory;
 
 
 unsigned int GetCfgComPort()
@@ -379,4 +381,127 @@ unsigned int GetCfgLogAmplitude()
 unsigned int GetCfgPeakValues()
 {
 	return cfg_peakValues;
+}
+
+
+
+bool SetCfgComPort(unsigned int value)
+{
+	if (cfg_comPort != value) {
+		cfg_comPort = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgMatrixRows(unsigned int value)
+{
+	if (cfg_matrixRows != value) {
+		cfg_matrixRows = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgMatrixCols(unsigned int value)
+{
+	if (cfg_matrixCols != value) {
+		cfg_matrixCols = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgBrightness(unsigned int value)
+{
+	if (cfg_brightness != value) {
+		cfg_brightness = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgUpdateInterval(unsigned int value)
+{
+	if (cfg_updateInterval != value) {
+		cfg_updateInterval = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgStartLed(unsigned int value)
+{
+	if (cfg_startLed != value) {
+		cfg_startLed = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgLedDirection(unsigned int value)
+{
+	if (cfg_ledDirection != value) {
+		cfg_ledDirection = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgLineStyle(unsigned int value)
+{
+	if (cfg_lineStyle != value) {
+		cfg_lineStyle = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgLogFrequency(unsigned int value)
+{
+	if (cfg_logFrequency != value) {
+		cfg_logFrequency = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgLogAmplitude(unsigned int value)
+{
+	if (cfg_logAmplitude != value) {
+		cfg_logAmplitude = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgPeakValues(unsigned int value)
+{
+	if (cfg_peakValues != value) {
+		cfg_peakValues = value;
+		return true;
+	}
+	else {
+		return false;
+	}
 }

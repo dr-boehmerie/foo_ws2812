@@ -5,7 +5,7 @@
 #include "foo_ws2812.h"
 
 
-class myinitquit : public initquit {
+class ws2812_initquit : public initquit {
 public:
 	void on_init() {
 		console::print("WS2812 Output: on_init()");
@@ -19,4 +19,4 @@ public:
 	}
 };
 
-static initquit_factory_t<myinitquit> g_myinitquit_factory;
+static initquit_factory_t<ws2812_initquit> g_ws2812_initquit_factory;
