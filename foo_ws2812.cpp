@@ -247,8 +247,127 @@ enum led_mode ws2812::GetLedMode(unsigned int startLed, unsigned int ledDir)
 	return result;
 }
 
+void ws2812::InitIndexLut(void)
+{
+	unsigned int	row, col;
+	unsigned int	idx;
+
+	if (indexLut == nullptr)
+		return;
+
+	switch (ledMode)
+	{
+	default:
+	case ws2812_led_mode_top_left_common:			// Top Left, Common direction left to right
+		// 1:1
+		for (idx = 0; idx < (rows * columns); idx++) {
+			indexLut[idx] = idx;
+		}
+		break;
+
+	case ws2812_led_mode_top_right_common:			// Top Right, Common direction right to left
+		idx = 0;
+		for (row = 0; row < rows; row++) {
+			for (col = 0; col < columns; col++) {
+				indexLut[idx] = row * columns + (columns - 1 - col);
+				idx++;
+			}
+		}
+		break;
+
+	case ws2812_led_mode_bottom_left_common:		// Bottom Left, Common direction left to right
+		idx = 0;
+		for (row = 0; row < rows; row++) {
+			for (col = 0; col < columns; col++) {
+				indexLut[idx] = (rows - 1 - row) * columns + col;
+				idx++;
+			}
+		}
+		break;
+
+	case ws2812_led_mode_bottom_right_common:		// Bottom Right, Common direction right to left
+		idx = 0;
+		for (row = 0; row < rows; row++) {
+			for (col = 0; col < columns; col++) {
+				indexLut[idx] = (rows - 1 - row) * columns + (columns - 1 - col);
+				idx++;
+			}
+		}
+		break;
+
+	case ws2812_led_mode_top_left_alternating:		// Top Left, Alternating direction left to right/right to left
+		idx = 0;
+		for (row = 0; row < rows; row++) {
+			for (col = 0; col < columns; col++) {
+				if ((row & 1) == 0) {
+					// even row: left to right
+					indexLut[idx] = row * columns + col;
+				}
+				else {
+					// odd row: right to left
+					indexLut[idx] = row * columns + (columns - 1 - col);
+				}
+				idx++;
+			}
+		}
+		break;
+
+	case ws2812_led_mode_top_right_alternating:		// Top Right, Alternating direction right to left/left to right
+		idx = 0;
+		for (row = 0; row < rows; row++) {
+			for (col = 0; col < columns; col++) {
+				if ((row & 1) != 0) {
+					// odd row: left to right
+					indexLut[idx] = row * columns + col;
+				}
+				else {
+					// even row: right to left
+					indexLut[idx] = row * columns + (columns - 1 - col);
+				}
+				idx++;
+			}
+		}
+		break;
+
+	case ws2812_led_mode_bottom_left_alternating:	// Bottom Left, Alternating direction left to right/right to left
+		idx = 0;
+		for (row = 0; row < rows; row++) {
+			for (col = 0; col < columns; col++) {
+				if ((row & 1) == (rows & 1)) {
+					// last row, second next to last and so on: left to right
+					indexLut[idx] = (rows - 1 - row) * columns + col;
+				}
+				else {
+					// other row: right to left
+					indexLut[idx] = (rows - 1 - row) * columns + (columns - 1 - col);
+				}
+				idx++;
+			}
+		}
+		break;
+
+	case ws2812_led_mode_bottom_right_alternating:	// Bottom Right, Alternating right to left/direction left to right
+		idx = 0;
+		for (row = 0; row < rows; row++) {
+			for (col = 0; col < columns; col++) {
+				if ((row & 1) == (rows & 1)) {
+					// last row, second next to last and so on: right to left
+					indexLut[idx] = (rows - 1 - row) * columns + (columns - 1 - col);
+				}
+				else {
+					// other row: left to right
+					indexLut[idx] = (rows - 1 - row) * columns + col;
+				}
+				idx++;
+			}
+		}
+		break;
+	}
+}
+
 unsigned int ws2812::LedIndex(unsigned int row, unsigned int col)
 {
+#if 0
 	unsigned int	result = 0;
 
 	switch (ledMode)
@@ -272,26 +391,57 @@ unsigned int ws2812::LedIndex(unsigned int row, unsigned int col)
 	case ws2812_led_mode_top_left_alternating:		// Top Left, Alternating direction left to right/right to left
 		if ((row & 1) == 0) {
 			// even row: left to right
+			result = row * columns + col;
 		}
 		else {
 			// odd row: right to left
+			result = row * columns + (columns - 1 - col);
 		}
 		break;
 
 	case ws2812_led_mode_top_right_alternating:		// Top Right, Alternating direction right to left/left to right
+		if ((row & 1) != 0) {
+			// odd row: left to right
+			result = row * columns + col;
+		}
+		else {
+			// even row: right to left
+			result = row * columns + (columns - 1 - col);
+		}
 		break;
 
 	case ws2812_led_mode_bottom_left_alternating:	// Bottom Left, Alternating direction left to right/right to left
+		if ((row & 1) == (rows & 1)) {
+			// last row, second next to last and so on: left to right
+			result = (rows - 1 - row) * columns + col;
+		}
+		else {
+			// other row: right to left
+			result = (rows - 1 - row) * columns + (columns - 1 - col);
+		}
 		break;
 
 	case ws2812_led_mode_bottom_right_alternating:	// Bottom Right, Alternating right to left/direction left to right
+		if ((row & 1) == (rows & 1)) {
+			// last row, second next to last and so on: right to left
+			result = (rows - 1 - row) * columns + (columns - 1 - col);
+		}
+		else {
+			// other row: left to right
+			result = (rows - 1 - row) * columns + col;
+		}
 		break;
 	}
 
+	// smaller than 0 will overflow and be filtered out, hopefully
 	if (result < rows * columns)
 		return result;
 
 	return 0;
+#else
+	// use prebuilt lut
+	return indexLut[row * columns + col];
+#endif
 }
 
 void ws2812::CalcColorWhiteBar(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
@@ -300,7 +450,7 @@ void ws2812::CalcColorWhiteBar(unsigned int row, audio_sample sample, unsigned i
 		// off
 		r = g = b = 0;
 	}
-	else if ((audio_sample)row == floor(sample)) {
+	else if (row == (unsigned int)floor(sample)) {
 		// peak
 		r = g = b = 255;
 	}
@@ -345,6 +495,7 @@ void ws2812::CalcColor(audio_sample sample, audio_sample min, unsigned int &r, u
 
 void ws2812::CalcRowColor(audio_sample row, unsigned int &r, unsigned int &g, unsigned int &b)
 {
+#if 0
 	audio_sample	row_max = (audio_sample)rows - 1;
 	audio_sample	r_start, g_start, b_start;
 	audio_sample	r_end, g_end, b_end;
@@ -369,15 +520,38 @@ void ws2812::CalcRowColor(audio_sample row, unsigned int &r, unsigned int &g, un
 	r = (unsigned int)r_end;
 	g = (unsigned int)g_end;
 	b = (unsigned int)b_end;
+#else
+	// use color table
+	unsigned int	tabIdx;
+	audio_sample	m, n;
+
+	m = (audio_sample)colorNo / (audio_sample)rows;
+	n = 0;	// (audio_sample)colorNo - (audio_sample)rows * m;
+
+	if (row >= (audio_sample)rows) {
+		tabIdx = colorNo - 1;
+	}
+	else if (row <= (audio_sample)0.0) {
+		tabIdx = 0;
+	}
+	else {
+		tabIdx = (unsigned int)floor(row * m + n);
+	}
+	r = GET_COLOR_R(colorTab[tabIdx]);
+	g = GET_COLOR_G(colorTab[tabIdx]);
+	b = GET_COLOR_B(colorTab[tabIdx]);
+#endif
 }
 
 void ws2812::CalcColorColoredRows(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
 {
-	if ((audio_sample)row > sample) {
+	unsigned int	peak = (unsigned int)round(sample);
+
+	if (row > peak) {
 		// off
 		r = g = b = 0;
 	}
-	else if ((audio_sample)row == floor(sample)) {
+	else if (row == peak) {
 		// peak
 		CalcRowColor((audio_sample)row, r, g, b);
 	}
@@ -402,11 +576,13 @@ void ws2812::CalcColorColoredRows(unsigned int row, audio_sample sample, unsigne
 
 void ws2812::CalcColorColoredBars(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
 {
-	if ((audio_sample)row > sample) {
+	unsigned int	peak = (unsigned int)round(sample);
+
+	if (row > peak) {
 		// off
 		r = g = b = 0;
 	}
-	else if ((audio_sample)row == floor(sample)) {
+	else if (row == peak) {
 		// peak
 		CalcRowColor(sample, r, g, b);
 	}
@@ -557,7 +733,7 @@ void ws2812::ColorsToBuffer(unsigned char *buffer, unsigned int led_index, unsig
 	if (b < 2)	b = 0;
 
 	// write colors to buffer
-	// color ouput order: GRB
+	// color ouput order is fixed to GRB
 	buffer[3 * led_index + 0] = (unsigned char)g;
 	buffer[3 * led_index + 1] = (unsigned char)r;
 	buffer[3 * led_index + 2] = (unsigned char)b;
@@ -577,7 +753,7 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 	enum line_style	line_style = this->lineStyle;
 	audio_sample	sum;
 	audio_sample	sample;
-	audio_sample	db_per_row;
+	audio_sample	m, n;
 	audio_sample	db_max;
 	audio_sample	db_min;
 	double			log_mult;
@@ -596,8 +772,10 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 		return;
 	}
 
-	// 10 db per row
-	db_per_row = (db_max - db_min) / (audio_sample)rows;
+	// rows per dB
+	m = (audio_sample)rows / (db_max - db_min);
+	// offset: no lights @ db_min
+	n = 0 - m * db_min;
 
 	// multiple samples added together for one bar
 	samples_per_bar = samples / bar_cnt;
@@ -759,15 +937,17 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 		bar_freq *= log_mult;
 
 		// calc height of bar in rows
-		// 0 db is max, -10 * (rows - 1) is min
 		if (sample >= db_max) {
+			// all rows
 			sample = (audio_sample)rows;
-
-		} else if (sample < db_min) {
+		}
+		else if (sample < db_min) {
+			// none
 			sample = (audio_sample)0.0;
-
-		} else {
-			sample = (sample / db_per_row) + (audio_sample)rows;
+		}
+		else {
+			// between
+			sample = sample * m + n;
 		}
 
 		// colorize the bar
@@ -776,10 +956,11 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 		default:
 		case ws2812_spectrum_simple:		// simple white bars
 			for (row = 1; row <= rows; row++) {
+				// shades of white
+				CalcColorWhiteBar(row, sample, r, g, b);
+
 				// invert Y axis: y = rows - row
 				led_index = LedIndex(rows - row, bar);
-
-				CalcColorWhiteBar(row, sample, r, g, b);
 
 				AddPersistenceSpectrum(led_index, r, g, b);
 
@@ -791,10 +972,11 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 
 		case ws2812_spectrum_green_red_bars:		// from green to red, each row a single color
 			for (row = 1; row <= rows; row++) {
+				// transition from green to red
+				CalcColorColoredRows(row, sample, r, g, b);
+
 				// invert Y axis: y = rows - row
 				led_index = LedIndex(rows - row, bar);
-
-				CalcColorColoredRows(row, sample, r, g, b);
 
 				AddPersistenceSpectrum(led_index, r, g, b);
 
@@ -804,12 +986,13 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 			}
 			break;
 
-		case ws2812_spectrum_fire_lines:		// fire style: from green to red the whole bar a single color
+		case ws2812_spectrum_fire_lines:		// fire style: from green to red the whole bar in one color
 			for (row = 1; row <= rows; row++) {
+				// transition from green to red
+				CalcColorColoredBars(row, sample, r, g, b);
+
 				// invert Y axis: y = rows - row
 				led_index = LedIndex(rows - row, bar);
-
-				CalcColorColoredBars(row, sample, r, g, b);
 
 				AddPersistenceSpectrum(led_index, r, g, b);
 
@@ -847,14 +1030,14 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 		for (col = 0; col < cols - 1; col++) {
 			for (row = 0; row < rows; row++) {
 				// new col
-				led_index = LedIndex(row, col);
+				unsigned int new_index = LedIndex(row, col);
 				// old col
-				sample_index = LedIndex(row, col + 1);
+				unsigned int old_index = LedIndex(row, col + 1);
 
 				// copy colors
-				buffer[3 * led_index + 0] = buffer[3 * sample_index + 0];
-				buffer[3 * led_index + 1] = buffer[3 * sample_index + 1];
-				buffer[3 * led_index + 2] = buffer[3 * sample_index + 2];
+				buffer[3 * new_index + 0] = buffer[3 * old_index + 0];
+				buffer[3 * new_index + 1] = buffer[3 * old_index + 1];
+				buffer[3 * new_index + 2] = buffer[3 * old_index + 2];
 			}
 		}
 		// new values added in the last col (right)
@@ -868,14 +1051,14 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 		for (row = 0; row < rows - 1; row++) {
 			for (col = 0; col < cols; col++) {
 				// new col
-				led_index = LedIndex(row, col);
+				unsigned int new_index = LedIndex(row, col);
 				// old col
-				sample_index = LedIndex(row + 1, col);
+				unsigned int old_index = LedIndex(row + 1, col);
 
 				// copy colors
-				buffer[3 * led_index + 0] = buffer[3 * sample_index + 0];
-				buffer[3 * led_index + 1] = buffer[3 * sample_index + 1];
-				buffer[3 * led_index + 2] = buffer[3 * sample_index + 2];
+				buffer[3 * new_index + 0] = buffer[3 * old_index + 0];
+				buffer[3 * new_index + 1] = buffer[3 * old_index + 1];
+				buffer[3 * new_index + 2] = buffer[3 * old_index + 2];
 			}
 		}
 		// new values added in the last row (bottom)
@@ -1108,7 +1291,7 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 	}
 }
 
-void ws2812::OutputOscilloscope(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer)
+void ws2812::OutputOscilloscope(const audio_sample *psample, unsigned int samples, unsigned int samplerate, audio_sample peak, unsigned char *buffer)
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
@@ -1119,10 +1302,11 @@ void ws2812::OutputOscilloscope(const audio_sample *psample, unsigned int sample
 	unsigned int	bright = this->brightness;
 	unsigned int	max_cnt;
 	audio_sample	sample;
-	audio_sample	val_per_row;
 	audio_sample	val_max;
 	audio_sample	val_min;
 	audio_sample	m, n;
+	audio_sample	duration;
+	unsigned int	samples_per_col;
 	unsigned int	max_wfm;
 
 	// scale waveform
@@ -1141,49 +1325,70 @@ void ws2812::OutputOscilloscope(const audio_sample *psample, unsigned int sample
 		return;
 	}
 
-	val_per_row = (val_max - val_min) / (audio_sample)rows;
+	// rows per "volt", invert Y axis
+	m = -1 * (audio_sample)rows / (val_max - val_min);
+	// center in Y
+	n = (audio_sample)(rows - 1) / 2 - 0 * m;
+
+	// curve duration, determines number of samples per column
+	duration = (audio_sample)100e-3;
+
+	samples_per_col = (unsigned int)floor((duration * (audio_sample)samplerate) / (audio_sample)cols);
+
+	// limit samples_per_col if not enough samples available (the length of the requested audio buffer is currently equal to the timer interval!)
+	if (samples < (samples_per_col * cols))
+		samples_per_col = samples / cols;
 
 	// clear counters
 	ClearCounterBuffer();
 
-	max_wfm = 4;
+	max_wfm = 1;
 	row = 0;
 	col = 0;
 	max_cnt = 1;
+	i = 0;
 	for (sample_index = 0; sample_index < samples; sample_index++) {
 		sample = psample[sample_index];
 
 		// sample to row
-		sample = sample / val_per_row;
-		// center in Y
-		sample += rows / 2;
+		sample = sample * m + n;
 
-		// invert Y axis
-		sample += 1;
-		if (sample > 0)
-			row = rows - (unsigned int)floor(sample);
-		else
-			row = rows / 2;
+		// prevent underflow
+		if (sample >= 0) {
+			row = (unsigned int)round(sample);
 
-		led_index = LedIndex(row, col);
+			// prevent overflow
+			if (row < rows) {
+				led_index = LedIndex(row, col);
 
-		// sum of all hits of this pixel
-		counterBuffer[led_index] += 1;
+				// sum of all hits of this pixel
+				counterBuffer[led_index] += 1;
 
-		// update max count for brightness calculation
-		if (max_cnt < counterBuffer[led_index])
-			max_cnt = counterBuffer[led_index];
+				// update max count for brightness calculation
+				if (max_cnt < counterBuffer[led_index])
+					max_cnt = counterBuffer[led_index];
+			}
+		}
 
+#if 0
 		// one samples per row, multiple chunks overlapped
-		col++;
-		if (col >= cols) {
-			col = 0;
+		{
+#else
+		// multiple samples in one column
+		i++;
+		if (i == samples_per_col) {
+			i = 0;
+#endif
+			col++;
+			if (col >= cols) {
+				col = 0;
 
-			// limit max overlapped waveforms
-			if (max_wfm > 0)
-				max_wfm--;
-			else
-				break;
+				// limit max overlapped waveforms
+				if (max_wfm > 0)
+					max_wfm--;
+				else
+					break;
+			}
 		}
 	}
 
@@ -1235,7 +1440,7 @@ void ws2812::CalcAndOutput(void)
 					// and must not occur in other bytes in the buffer
 					outputBuffer[0] = 1;
 
-					OutputOscilloscope(psample, samples, peak, &outputBuffer[1]);
+					OutputOscilloscope(psample, samples, sample_rate, peak, &outputBuffer[1]);
 
 					// send buffer
 					WriteABuffer(outputBuffer, bufferSize);
@@ -1410,6 +1615,7 @@ void ws2812::ConfigMatrix(int rows, int cols, enum start_led start_led, enum led
 {
 	bool	timerRunning;
 
+	// allow change of one dimension only, the other must be < 0
 	if (rows < 0)
 		rows = this->rows;
 	if (cols < 0)
@@ -1429,21 +1635,21 @@ void ws2812::ConfigMatrix(int rows, int cols, enum start_led start_led, enum led
 			// kill the timer
 			timerRunning = StopTimer();
 
-			if (outputBuffer)
-				delete outputBuffer;
-			outputBuffer = nullptr;
+			FreeBuffers();
 
-			if (persistenceBuffer)
-				delete persistenceBuffer;
-			persistenceBuffer = nullptr;
-
-			// 240 LEDs, RGB for each, plus one start byte
+			// allocate buffers
 			initDone = AllocateBuffers();
 			if (initDone) {
 				if (timerRunning) {
 					StartTimer();
 				}
 			}
+		}
+
+		if (initDone) {
+			// update led mode
+			ledMode = GetLedMode(start_led, led_dir);
+			InitIndexLut();
 		}
 	}
 }
@@ -1633,6 +1839,7 @@ void ws2812::SetLineStyle(enum line_style style)
 			break;
 
 		case ws2812_oscilloscope:
+			ClearOutputBuffer();
 			ClearPersistence();
 
 			// init default oscilloscope colors
@@ -1914,13 +2121,13 @@ void ws2812::ClearLedBuffer(unsigned char *buffer)
 
 void ws2812::InitAmplitudeMinMax()
 {
-	this->amplMin[ws2812_spectrum_simple] = -10 * rows;
-	this->amplMax[ws2812_spectrum_simple] = -10;
+	this->amplMin[ws2812_spectrum_simple] = -50;
+	this->amplMax[ws2812_spectrum_simple] = -15;
 
-	this->amplMin[ws2812_spectrum_green_red_bars] = -10 * rows;
-	this->amplMax[ws2812_spectrum_green_red_bars] = -10;
+	this->amplMin[ws2812_spectrum_green_red_bars] = -50;
+	this->amplMax[ws2812_spectrum_green_red_bars] = -15;
 
-	this->amplMin[ws2812_spectrum_fire_lines] = -10 * rows;
+	this->amplMin[ws2812_spectrum_fire_lines] = -50;
 	this->amplMax[ws2812_spectrum_fire_lines] = -10;
 
 	this->amplMin[ws2812_spectrogram_horizontal] = -40;
@@ -2017,6 +2224,8 @@ ws2812::ws2812()
 
 			ledMode = GetLedMode(GetCfgStartLed(), GetCfgLedDirection());
 
+			InitIndexLut();
+
 			timerStartDelay = 500;
 
 			// fast FFT
@@ -2095,6 +2304,8 @@ ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, unsigned
 			peakValues = true;
 
 			ledMode = GetLedMode(0, 0);
+
+			InitIndexLut();
 
 			timerStartDelay = 500;
 

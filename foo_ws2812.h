@@ -107,6 +107,7 @@ private:
 	void ClearCounterBuffer(void);
 	void ClearLedBuffer(unsigned char *buffer);
 
+	void InitIndexLut(void);
 	unsigned int LedIndex(unsigned int row, unsigned int col);
 	enum led_mode GetLedMode(unsigned int startLed, unsigned int ledDir);
 	void CalcColorWhiteBar(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
@@ -125,7 +126,7 @@ private:
 	void OutputTest(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer, unsigned int bufferSize);
 	void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer);
 	void OutputSpectrogram(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer);
-	void OutputOscilloscope(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer);
+	void OutputOscilloscope(const audio_sample *psample, unsigned int samples, unsigned int samplerate, audio_sample peak, unsigned char *buffer);
 
 public:
 	static const unsigned int	rows_min = 1;
@@ -149,13 +150,16 @@ public:
 	static const unsigned int	timerInterval_def = 330;
 
 	static const int			frequency_min = 10;
-	static const int			frequency_max = 22100;
+	static const int			frequency_max = 22050;
 
 	static const int			amplitude_min = -100;
 	static const int			amplitude_max = 10;
 
-	const unsigned int	spectrumColorTab[2] = { MAKE_COLOR(0, 255, 0), MAKE_COLOR(0, 255, 0) };
-	const unsigned int	spectrogramColorTab[4] = { MAKE_COLOR(0, 0, 0), MAKE_COLOR(0, 0, 127), MAKE_COLOR(0, 200, 0), MAKE_COLOR(255, 0, 0) };
+	// green > red
+	const unsigned int	spectrumColorTab[3] = { MAKE_COLOR(0, 255, 0), MAKE_COLOR(200, 200, 0), MAKE_COLOR(255, 0, 0) };
+	// black > blue > green > yellow > red
+	const unsigned int	spectrogramColorTab[5] = { MAKE_COLOR(0, 0, 0), MAKE_COLOR(0, 0, 127), MAKE_COLOR(0, 200, 0), MAKE_COLOR(200, 200, 0), MAKE_COLOR(255, 0, 0) };
+	// black > white
 	const unsigned int	oscilloscopeColorTab[2] = { MAKE_COLOR(0, 0, 0), MAKE_COLOR(255, 255, 255)};
 
 private:

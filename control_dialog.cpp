@@ -334,7 +334,11 @@ void CWS2812ControlDialog::OnStopOutputClicked(UINT code, int id, CWindow hwnd)
 		EnableButton(IDC_START_OUTPUT, true);
 	}
 	else {
+		// disable "Stop" button
+		EnableButton(IDC_STOP_OUTPUT, false);
 
+		// enable "Start" button
+		EnableButton(IDC_START_OUTPUT, true);
 	}
 }
 
