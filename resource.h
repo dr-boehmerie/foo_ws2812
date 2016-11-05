@@ -21,6 +21,7 @@
 #define IDC_NEXT                        1008
 #define IDC_RAND                        1009
 #define IDC_CONTEXTMENU                 1010
+#define IDC_SAVE_CFG                    1010
 #define IDC_SLIDER                      1012
 #define IDC_SLIDER_LABEL                1013
 #define IDC_OUTPUT                      1014
@@ -49,10 +50,16 @@
 #define IDC_TXT_INTERVAL                1038
 #define IDC_STYLE_0                     1039
 #define IDC_STYLE_1                     1040
+#define IDC_TXT_SPECTRUM_COLORS         1040
 #define IDC_STYLE_2                     1041
+#define IDC_TXT_SPECTRUM_BAR_COLORS     1041
 #define IDC_STYLE_3                     1042
+#define IDC_TXT_SPECTRUM_FIRE_COLORS    1042
 #define IDC_STYLE_4                     1043
 #define IDC_STYLE_5                     1044
+#define IDC_TXT_SPECTROGRAM_COLORS      1044
+#define IDC_TXT_SPECTRUM_BAR_COLORS4    1045
+#define IDC_TXT_OSCILLOSCOPE_COLORS     1045
 
 // Next default values for new objects
 // 
@@ -60,7 +67,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        106
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1040
+#define _APS_NEXT_CONTROL_VALUE         1041
 #define _APS_NEXT_SYMED_VALUE           102
 #endif
 #endif

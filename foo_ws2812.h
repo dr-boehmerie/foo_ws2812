@@ -61,7 +61,7 @@ public:
 
 	ws2812(unsigned int rows, unsigned int cols, unsigned int port, unsigned int interval, enum line_style style);
 
-	void ConfigMatrix(int rows, int cols, enum start_led start_led, enum led_direction led_dir);
+	bool ConfigMatrix(int rows, int cols, enum start_led start_led, enum led_direction led_dir);
 	bool SetComPort(unsigned int port);
 	void CalcAndOutput(void);
 
@@ -89,9 +89,11 @@ public:
 	bool StartOutput(void);
 	bool StopOutput(void);
 	bool ToggleOutput(void);
+	bool GetOutputState(void);
 
-	void InitColorTab(void);
-	void InitColorTab(const unsigned int *initTab, unsigned int tabElements);
+	bool InitColorTab(void);
+	bool InitColorTab(const unsigned int *initTab, unsigned int tabElements);
+	bool InitColorTab(const char *pattern);
 
 private:
 	BOOL OpenPort(LPCWSTR gszPort, unsigned int port);
@@ -110,7 +112,7 @@ private:
 	void InitIndexLut(void);
 	unsigned int LedIndex(unsigned int row, unsigned int col);
 	enum led_mode GetLedMode(unsigned int startLed, unsigned int ledDir);
-	void CalcColorWhiteBar(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
+	void CalcColorSimple(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
 	void CalcColor(audio_sample sample, audio_sample min, unsigned int &r, unsigned int &g, unsigned int &b);
 	void CalcRowColor(audio_sample row, unsigned int &r, unsigned int &g, unsigned int &b);
 	void CalcColorColoredRows(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
@@ -154,6 +156,9 @@ public:
 
 	static const int			amplitude_min = -100;
 	static const int			amplitude_max = 10;
+
+	static const int			amplitude_oscilloscope_min = -100;
+	static const int			amplitude_oscilloscope_max = 100;
 
 	// green > red
 	const unsigned int	spectrumColorTab[3] = { MAKE_COLOR(0, 255, 0), MAKE_COLOR(200, 200, 0), MAKE_COLOR(255, 0, 0) };
@@ -217,26 +222,31 @@ void DeinitOutput();
 bool StopOutput(void);
 bool StartOutput(void);
 bool ToggleOutput(void);
+bool GetOutputState(void);
 
-void ConfigMatrix(int rows, int cols, int start_led, int led_dir);
-void SetScaling(int logFrequency, int logAmplitude, int peakValues);
-void SetLineStyle(unsigned int lineStyle);
-void SetBrightness(unsigned int brightness);
+bool ConfigMatrix(int rows, int cols, int start_led, int led_dir);
+bool SetScaling(int logFrequency, int logAmplitude, int peakValues);
+bool SetLineStyle(unsigned int lineStyle);
+bool SetBrightness(unsigned int brightness);
 
-void SetAmplitudeMinMax(int min, int max);
-void SetFrequencyMinMax(int min, int max);
+bool SetAmplitudeMinMax(int min, int max);
+bool SetFrequencyMinMax(int min, int max);
 
-void SetComPort(unsigned int port);
+void SaveAmplitudeMinMax();
 
-void SetInterval(unsigned int interval);
+bool SetComPort(unsigned int port);
 
-void GetScaling(int *logFrequency, int *logAmplitude, int *peakValues);
-void GetInterval(unsigned int *interval);
-void GetBrightness(unsigned int *brightness);
-void GetLineStyle(unsigned int *lineStyle);
+bool SetInterval(unsigned int interval);
 
-void GetAmplitudeMinMax(int *min, int *max);
-void GetFrequencyMinMax(int *min, int *max);
+bool GetScaling(int *logFrequency, int *logAmplitude, int *peakValues);
+bool GetInterval(unsigned int *interval);
+bool GetBrightness(unsigned int *brightness);
+bool GetLineStyle(unsigned int *lineStyle);
+
+bool GetAmplitudeMinMax(int *min, int *max);
+bool GetFrequencyMinMax(int *min, int *max);
+
+bool InitColorTab(const char *pattern);
 
 
 // playback_state.cpp
@@ -258,6 +268,14 @@ unsigned int GetCfgLineStyle();
 unsigned int GetCfgLogFrequency();
 unsigned int GetCfgLogAmplitude();
 unsigned int GetCfgPeakValues();
+const char * GetCfgSpectrumColors();
+const char * GetCfgSpectrumBarColors();
+const char * GetCfgSpectrumFireColors();
+const char * GetCfgSpectrogramColors();
+const char * GetCfgOscilloscopeColors();
+void GetCfgSpectrumAmplitudeMinMax(int *min, int *max);
+void GetCfgSpectrogramAmplitudeMinMax(int *min, int *max);
+void GetCfgOscilloscopeAmplitudeMinMax(int *min, int *max);
 
 bool SetCfgComPort(unsigned int value);
 bool SetCfgMatrixRows(unsigned int value);
@@ -271,3 +289,7 @@ bool SetCfgLineStyle(unsigned int value);
 bool SetCfgLogFrequency(unsigned int value);
 bool SetCfgLogAmplitude(unsigned int value);
 bool SetCfgPeakValues(unsigned int value);
+
+bool SetCfgSpectrumAmplitudeMinMax(int min, int max);
+bool SetCfgSpectrogramAmplitudeMinMax(int min, int max);
+bool SetCfgOscilloscopeAmplitudeMinMax(int min, int max);
