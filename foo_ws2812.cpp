@@ -1623,8 +1623,10 @@ bool ws2812::GetOutputState(void)
 
 bool GetOutputState(void)
 {
-	if (ws2812_global)
-	return ws2812_global->GetOutputState();
+	if (ws2812_global) {
+		return ws2812_global->GetOutputState();
+	}
+	return false;
 }
 
 
