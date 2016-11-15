@@ -753,21 +753,28 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
+	unsigned int	bright = this->brightness;
+	enum line_style	line_style = this->lineStyle;
+	bool			log_a = this->logAmplitude;
+	bool			log_f = this->logFrequency;
+	bool			peaks = this->peakValues;
+
 	unsigned int	bar, cnt, row;
 	unsigned int	bar_cnt;
 	unsigned int	samples_per_bar;
 	unsigned int	sample_index;
+	unsigned int	sample_min, sample_max;
 	unsigned int	led_index;
 	unsigned int	r, g, b;
-	unsigned int	bright =this->brightness;
-	enum line_style	line_style = this->lineStyle;
 	audio_sample	sum;
 	audio_sample	sample;
 	audio_sample	m, n;
 	audio_sample	db_max;
 	audio_sample	db_min;
-	double			log_mult;
 	double			bar_freq;
+	double			f_min, f_max;
+	double			f_mult;
+	bool			f_limit;
 
 	// vertical bars
 	bar_cnt = cols;
@@ -794,37 +801,72 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 		samples_per_bar = 1;
 	}
 
-	// fixed peak value
+	// first bar includes samples up to 50 Hz
+	f_min = 50.0;
+	f_max = (double)delta_f * (double)samples;
+	f_limit = false;
+
+	sample_min = 0;
+	sample_max = samples;
+
+	// user limits
+	if (this->freqMin[this->lineStyle] > frequency_min) {
+		f_limit = true;
+
+		f_min = (double)this->freqMin[this->lineStyle];
+		sample_min = (unsigned int)floor(f_min / (double)delta_f);
+	}
+
+	if (this->freqMax[this->lineStyle] < frequency_max) {
+		f_limit = true;
+
+		f_max = (double)this->freqMax[this->lineStyle];
+		sample_max = (unsigned int)ceil(f_max / (double)delta_f);
+	}
+
+	if (f_limit)
+		samples = sample_max - sample_min;
+
+	if (f_max <= f_min || samples <= bar_cnt) {
+		// invalid values
+		ClearLedBuffer(buffer);
+		return;
+	}
+
+	// nth root of max_freq/min_freq, where n is the count of bars
+	f_mult = pow(f_max / f_min, 1.0 / (double)bar_cnt);
+
+	if (log_f == false) {
+		// multiple samples added together for one bar
+		samples_per_bar = samples / bar_cnt;
+		if (samples_per_bar < 1)
+			samples_per_bar = 1;
+	}
+	else {
+		samples_per_bar = 1;
+	}
+
+	// fixed peak value for mean calculation
 	peak = (audio_sample)(1.0 * samples_per_bar);
 
-
-	// first bar includes samples up to 50 Hz
-	bar_freq = 50;
-
-//	log_mult = log10(samples);
-//	log_mult /= (double)bar_cnt;
-	log_mult = delta_f * (audio_sample)samples;
-	log_mult /= bar_freq;
-	// nth root of max_freq/min_freq, where n is the count of bars
-	log_mult = pow(log_mult, 1.0 / bar_cnt);
-
-	sample_index = 0;
+	bar_freq = f_min;
+	sample_index = sample_min;
 
 	for (bar = 0; bar < bar_cnt; bar++) {
-		if (logFrequency == false) {
+		if (log_f == false) {
 			// linear frequency scaling
 
 			if (bar == (bar_cnt - 1)) {
 				// last bar -> remaining samples
-				samples_per_bar = samples - sample_index;
+				samples_per_bar = sample_max - sample_index;
 			}
 			else {
 				// prevent index overflow
-				if ((sample_index + samples_per_bar) >= samples)
-					samples_per_bar = samples - sample_index;
+				if ((sample_index + samples_per_bar) >= sample_max)
+					samples_per_bar = sample_max - sample_index;
 			}
 
-			if (peakValues == false) {
+			if (peaks == false) {
 				// calc mean value of samples per bar
 				sum = 0;
 				for (cnt = 0; cnt < samples_per_bar; cnt++) {
@@ -832,7 +874,7 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 					sum += fabs(sample);
 				}
 
-				if (logAmplitude) {
+				if (log_a) {
 					// calc ratio to peak, logarithmic scale: volts to db
 					sample = 20 * log10(sum / peak);
 				}
@@ -851,7 +893,7 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 						sum = sample;
 				}
 
-				if (logAmplitude) {
+				if (log_a) {
 					// logarithmic scale: volts to db
 					sample = 20 * log10(sum);
 				}
@@ -864,18 +906,11 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 		}
 		else {
 			// logarithmic frequency scaling
-			// number of samples per bar depends on bar index
-		//	if (bar == 0) {
-		//		// first bar -> everthing up to 50 Hz
-		//		samples_per_bar = (unsigned int)(50 / delta_f);
-		//		if (samples_per_bar < 1)
-		//			samples_per_bar = 1;
-		//	}
-		//	else
+
 			if (bar == (bar_cnt - 1)) {
 				// last bar -> remaining samples
-				if (samples > sample_index)
-					samples_per_bar = samples - sample_index;
+				if (sample_max > sample_index)
+					samples_per_bar = sample_max - sample_index;
 				else
 					samples_per_bar = 0;
 			}
@@ -883,9 +918,6 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 				double	tmp;
 
 				// calc start sample index of the following bar
-			//	tmp = log_mult * (double)(bar + 1);
-			//	tmp = pow(10, tmp);
-			//	tmp = 50 * pow(log_mult, bar) / delta_f;
 				tmp = ceil(bar_freq / delta_f);
 
 				// count of samples to the next index
@@ -894,57 +926,64 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 				else
 					samples_per_bar = (unsigned int)tmp - sample_index;
 
-				// minimum sample count (trial and error, should depend somehow on the max fft frequency...)
+				// minimum sample count
 				if (samples_per_bar < 1)
 					samples_per_bar = 1;
 
 				// prevent index overflow
-				if (sample_index >= samples)
+				if (sample_index >= sample_max)
 					samples_per_bar = 0;
-				else if ((sample_index + samples_per_bar) >= samples)
-					samples_per_bar = samples - sample_index;
+				else if ((sample_index + samples_per_bar) >= sample_max)
+					samples_per_bar = sample_max - sample_index;
 			}
 
-			if (peakValues == false) {
-				// calc mean value of samples per bar
-				sum = 0;
-				for (cnt = 0; cnt < samples_per_bar; cnt++) {
-					sample = psample[sample_index + cnt];
-					sum += fabs(sample);
-				}
+			if (samples_per_bar > 0) {
+				if (peaks == false) {
+					// calc mean value of samples per bar
+					sum = 0;
+					for (cnt = 0; cnt < samples_per_bar; cnt++) {
+						sample = psample[sample_index + cnt];
+						sum += fabs(sample);
+					}
+					// variable peak
+					peak = (audio_sample)(1.0 * samples_per_bar);
 
-				if (logAmplitude) {
-					// calc ratio to peak, logarithmic scale: volts to db
-					sample = 20 * log10(sum / peak);
+					if (log_a) {
+						// calc ratio to peak, logarithmic scale: volts to db
+						sample = 20 * log10(sum / peak);
+					}
+					else {
+						// calc ratio to peak, linear scale
+						sample = (sum / peak) * (db_max - db_min) + db_min;
+					}
 				}
 				else {
-					// calc ratio to peak, linear scale
-					sample = (sum / peak) * (db_max - db_min) + db_min;
+					// find peak value of samples per bar
+					sum = 0;
+					for (cnt = 0; cnt < samples_per_bar; cnt++) {
+						sample = psample[sample_index + cnt];
+						sample = fabs(sample);
+						if (sum < sample)
+							sum = sample;
+					}
+
+					if (log_a) {
+						// logarithmic scale: volts to db
+						sample = 20 * log10(sum);
+					}
+					else {
+						// linear scale
+						sample = sum * (db_max - db_min) + db_min;
+					}
 				}
+				sample_index += samples_per_bar;
 			}
 			else {
-				// find peak value of samples per bar
-				sum = 0;
-				for (cnt = 0; cnt < samples_per_bar; cnt++) {
-					sample = psample[sample_index + cnt];
-					sample = fabs(sample);
-					if (sum < sample)
-						sum = sample;
-				}
-
-				if (logAmplitude) {
-					// logarithmic scale: volts to db
-					sample = 20 * log10(sum);
-				}
-				else {
-					// linear scale
-					sample = sum * (db_max - db_min) + db_min;
-				}
+				sample = 0;
 			}
-			sample_index += samples_per_bar;
 		}
 		// increase max frequency for the next bar
-		bar_freq *= log_mult;
+		bar_freq *= f_mult;
 
 		// calc height of bar in rows
 		if (sample >= db_max) {
@@ -1019,21 +1058,105 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
+	unsigned int	bright = this->brightness;
+	bool			log_a = this->logAmplitude;
+	bool			log_f = this->logFrequency;
+	bool			peaks = this->peakValues;
+
 	unsigned int	bar, cnt, row, col;
 	unsigned int	bar_cnt;
 	unsigned int	samples_per_bar;
 	unsigned int	sample_index;
+	unsigned int	sample_min, sample_max;
 	unsigned int	led_index;
 	unsigned int	r, g, b, i;
-	unsigned int	bright = this->brightness;
 	audio_sample	sum;
 	audio_sample	sample;
 	audio_sample	m, n;
 //	audio_sample	min;
 	audio_sample	db_max;
 	audio_sample	db_min;
-	double			log_mult;
 	double			bar_freq;
+	double			f_min, f_max;
+	double			f_mult;
+	bool			f_limit;
+
+	if (lineStyle == ws2812_spectrogram_horizontal) {
+		// horizontal bars
+		bar_cnt = rows;
+	}
+	else {
+		// vertical bars
+		bar_cnt = cols;
+	}
+
+	// limits
+	db_max = (audio_sample)this->amplMax[this->lineStyle];	// -5;
+	db_min = (audio_sample)this->amplMin[this->lineStyle];	//-40;
+
+	if (db_max <= db_min) {
+		// invalid values
+		ClearLedBuffer(buffer);
+		return;
+	}
+
+	// first bar includes samples up to 50 Hz
+	f_min = 50.0;
+	f_max = (double)delta_f * (double)samples;
+	f_limit = false;
+
+	sample_min = 0;
+	sample_max = samples;
+
+	// user limits
+	if (this->freqMin[this->lineStyle] > frequency_min) {
+		f_limit = true;
+
+		f_min = (double)this->freqMin[this->lineStyle];
+		sample_min = (unsigned int)floor(f_min / (double)delta_f);
+	}
+
+	if (this->freqMax[this->lineStyle] < frequency_max) {
+		f_limit = true;
+
+		f_max = (double)this->freqMax[this->lineStyle];
+		sample_max = (unsigned int)ceil(f_max / (double)delta_f);
+	}
+
+	if (f_limit)
+		samples = sample_max - sample_min;
+
+	if (f_max <= f_min || samples <= bar_cnt) {
+		// invalid values
+		ClearLedBuffer(buffer);
+		return;
+	}
+
+	// nth root of max_freq/min_freq, where n is the count of bars
+	f_mult = pow(f_max / f_min, 1.0 / (double)bar_cnt);
+
+	if (log_f == false) {
+		// multiple samples added together for one bar
+		samples_per_bar = samples / bar_cnt;
+		if (samples_per_bar < 1)
+			samples_per_bar = 1;
+	}
+	else {
+		samples_per_bar = 1;
+	}
+
+	// fixed peak value for mean calculation
+	peak = (audio_sample)(1.0 * samples_per_bar);
+
+#if 0
+	m = (audio_sample)1.0 / (db_max - db_min);
+	n = (audio_sample)1.0 - db_max * m;
+	min = (audio_sample)0.5;
+#else
+	// use colorTab
+	m = (audio_sample)colorNo / (db_max - db_min);
+	n = (audio_sample)colorNo - db_max * m;
+#endif
 
 	if (lineStyle == ws2812_spectrogram_horizontal) {
 		// move current image one col to the left
@@ -1052,9 +1175,6 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 		}
 		// new values added in the last col (right)
 		col = cols - 1;
-
-		// horizontal bars
-		bar_cnt = rows;
 	}
 	else {
 		// move current image one row up
@@ -1073,68 +1193,26 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 		}
 		// new values added in the last row (bottom)
 		row = rows - 1;
-
-		// vertical bars
-		bar_cnt = cols;
 	}
 
-	// limits
-	db_max = (audio_sample)this->amplMax[this->lineStyle];	// -5;
-	db_min = (audio_sample)this->amplMin[this->lineStyle];	//-40;
+	bar_freq = f_min;
+	sample_index = sample_min;
 
-	if (db_max <= db_min) {
-		// invalid values
-		ClearLedBuffer(buffer);
-		return;
-	}
-
-#if 0
-	m = (audio_sample)1.0 / (db_max - db_min);
-	n = (audio_sample)1.0 - db_max * m;
-	min = (audio_sample)0.5;
-#else
-	// use colorTab
-	m = (audio_sample)colorNo / (db_max - db_min);
-	n = (audio_sample)colorNo - db_max * m;
-#endif
-
-	// multiple samples added together for one bar
-	samples_per_bar = samples / bar_cnt;
-	if (samples_per_bar < 1) {
-		bar_cnt = samples;
-		samples_per_bar = 1;
-	}
-
-	// fixed peak value
-	peak = (audio_sample)(1.0 * samples_per_bar);
-
-
-	// first bar includes samples up to 50 Hz
-	bar_freq = 50;
-
-	//	log_mult = log10(samples);
-	//	log_mult /= (double)bar_cnt;
-	log_mult = delta_f * (audio_sample)samples;
-	log_mult /= bar_freq;
-	// nth root of max_freq/min_freq, where n is the count of bars
-	log_mult = pow(log_mult, 1.0 / bar_cnt);
-
-	sample_index = 0;
 	for (bar = 0; bar < bar_cnt; bar++) {
-		if (logFrequency == false) {
+		if (log_f == false) {
 			// linear frequency scaling
 
 			if (bar == (bar_cnt - 1)) {
 				// last bar -> remaining samples
-				samples_per_bar = samples - sample_index;
+				samples_per_bar = sample_max - sample_index;
 			}
 			else {
 				// prevent index overflow
-				if ((sample_index + samples_per_bar) >= samples)
-					samples_per_bar = samples - sample_index;
+				if ((sample_index + samples_per_bar) >= sample_max)
+					samples_per_bar = sample_max - sample_index;
 			}
 
-			if (peakValues == false) {
+			if (peaks == false) {
 				// calc mean value of samples per bar
 				sum = 0;
 				for (cnt = 0; cnt < samples_per_bar; cnt++) {
@@ -1142,7 +1220,7 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 					sum += fabs(sample);
 				}
 
-				if (logAmplitude) {
+				if (log_a) {
 					// calc ratio to peak, logarithmic scale: volts to db
 					sample = 20 * log10(sum / peak);
 				}
@@ -1161,7 +1239,7 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 						sum = sample;
 				}
 
-				if (logAmplitude) {
+				if (log_a) {
 					// logarithmic scale: volts to db
 					sample = 20 * log10(sum);
 				}
@@ -1174,18 +1252,11 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 		}
 		else {
 			// logarithmic frequency scaling
-			// number of samples per bar depends on bar index
-			//	if (bar == 0) {
-			//		// first bar -> everthing up to 50 Hz
-			//		samples_per_bar = (unsigned int)(50 / delta_f);
-			//		if (samples_per_bar < 1)
-			//			samples_per_bar = 1;
-			//	}
-			//	else
+
 			if (bar == (bar_cnt - 1)) {
 				// last bar -> remaining samples
-				if (samples > sample_index)
-					samples_per_bar = samples - sample_index;
+				if (sample_max > sample_index)
+					samples_per_bar = sample_max - sample_index;
 				else
 					samples_per_bar = 0;
 			}
@@ -1193,10 +1264,7 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 				double	tmp;
 
 				// calc start sample index of the following bar
-				//	tmp = log_mult * (double)(bar + 1);
-				//	tmp = pow(10, tmp);
-				//	tmp = 50 * pow(log_mult, bar) / delta_f;
-				tmp = ceil(bar_freq / delta_f);
+				tmp = ceil(bar_freq / (double)delta_f);
 
 				// count of samples to the next index
 				if (tmp <= (double)sample_index)
@@ -1204,57 +1272,64 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 				else
 					samples_per_bar = (unsigned int)tmp - sample_index;
 
-				// minimum sample count (trial and error, should depend somehow on the max fft frequency...)
+				// minimum sample count
 				if (samples_per_bar < 1)
 					samples_per_bar = 1;
 
 				// prevent index overflow
-				if (sample_index >= samples)
+				if (sample_index >= sample_max)
 					samples_per_bar = 0;
-				else if ((sample_index + samples_per_bar) >= samples)
-					samples_per_bar = samples - sample_index;
+				else if ((sample_index + samples_per_bar) >= sample_max)
+					samples_per_bar = sample_max - sample_index;
 			}
 
-			if (peakValues == false) {
-				// calc mean value of samples per bar
-				sum = 0;
-				for (cnt = 0; cnt < samples_per_bar; cnt++) {
-					sample = psample[sample_index + cnt];
-					sum += fabs(sample);
-				}
+			if (samples_per_bar > 0) {
+				if (peaks == false) {
+					// calc mean value of samples per bar
+					sum = 0;
+					for (cnt = 0; cnt < samples_per_bar; cnt++) {
+						sample = psample[sample_index + cnt];
+						sum += fabs(sample);
+					}
+					// variable peak
+					peak = (audio_sample)(1.0 * samples_per_bar);
 
-				if (logAmplitude) {
-					// calc ratio to peak, logarithmic scale: volts to db
-					sample = 20 * log10(sum / peak);
+					if (log_a) {
+						// calc ratio to peak, logarithmic scale: volts to db
+						sample = 20 * log10(sum / peak);
+					}
+					else {
+						// calc ratio to peak, linear scale
+						sample = (sum / peak) * (db_max - db_min) + db_min;
+					}
 				}
 				else {
-					// calc ratio to peak, linear scale
-					sample = (sum / peak) * (db_max - db_min) + db_min;
+					// find peak value of samples per bar
+					sum = 0;
+					for (cnt = 0; cnt < samples_per_bar; cnt++) {
+						sample = psample[sample_index + cnt];
+						sample = fabs(sample);
+						if (sum < sample)
+							sum = sample;
+					}
+
+					if (log_a) {
+						// logarithmic scale: volts to db
+						sample = 20 * log10(sum);
+					}
+					else {
+						// linear scale
+						sample = sum * (db_max - db_min) + db_min;
+					}
 				}
+				sample_index += samples_per_bar;
 			}
 			else {
-				// find peak value of samples per bar
-				sum = 0;
-				for (cnt = 0; cnt < samples_per_bar; cnt++) {
-					sample = psample[sample_index + cnt];
-					sample = fabs(sample);
-					if (sum < sample)
-						sum = sample;
-				}
-
-				if (logAmplitude) {
-					// logarithmic scale: volts to db
-					sample = 20 * log10(sum);
-				}
-				else {
-					// linear scale
-					sample = sum * (db_max - db_min) + db_min;
-				}
+				sample = 0;
 			}
-			sample_index += samples_per_bar;
 		}
 		// increase max frequency for the next bar
-		bar_freq *= log_mult;
+		bar_freq *= f_mult;
 
 #if 0
 		// calc height of bar in rows
@@ -1305,11 +1380,12 @@ void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int sampl
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
+	unsigned int	bright = this->brightness;
+
 	unsigned int	col, row;
 	unsigned int	sample_index;
 	unsigned int	led_index;
 	unsigned int	r, g, b, i;
-	unsigned int	bright = this->brightness;
 	unsigned int	max_cnt;
 	audio_sample	sample;
 	audio_sample	val_max;
@@ -1404,9 +1480,6 @@ void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int sampl
 
 	// convert sample counts to brightness
 	for (led_index = 0; led_index < rows * cols; led_index++) {
-		// shades of white, for a start
-	//	r = (counterBuffer[led_index] * 255) / max_cnt;
-	//	g = b = r;
 		// colorTab entry
 		i = (counterBuffer[led_index] * (colorNo - 1)) / max_cnt;
 		r = GET_COLOR_R(colorTab[i]);
@@ -2265,11 +2338,55 @@ bool GetAmplitudeMinMax(int *min, int *max)
 void ws2812::SetFrequencyMinMax(int min, int max)
 {
 	if (min < max) {
-		if (min >= frequency_min && min <= frequency_max)
-			this->freqMin[this->lineStyle] = min;
+		bool changed = false;
 
-		if (max >= frequency_min && max <= frequency_max)
-			this->freqMax[this->lineStyle] = max;
+		if (min >= frequency_min && min <= frequency_max) {
+			changed |= (this->freqMin[this->lineStyle] != min);
+		}
+		else {
+			min = this->freqMin[this->lineStyle];
+		}
+
+		if (max >= frequency_min && max <= frequency_max) {
+			changed |= (this->freqMax[this->lineStyle] != max);
+		}
+		else {
+			max = this->freqMax[this->lineStyle];
+		}
+
+		if (changed) {
+			switch (this->lineStyle)
+			{
+			case ws2812_spectrum_simple:
+			case ws2812_spectrum_green_red_bars:
+			case ws2812_spectrum_fire_lines:
+				// common values for spectrum
+				this->freqMin[ws2812_spectrum_simple] = min;
+				this->freqMax[ws2812_spectrum_simple] = max;
+				this->freqMin[ws2812_spectrum_green_red_bars] = min;
+				this->freqMax[ws2812_spectrum_green_red_bars] = max;
+				this->freqMin[ws2812_spectrum_fire_lines] = min;
+				this->freqMax[ws2812_spectrum_fire_lines] = max;
+				break;
+
+			case ws2812_spectrogram_horizontal:
+			case ws2812_spectrogram_vertical:
+				// common values for spectrogram
+				this->freqMin[ws2812_spectrogram_horizontal] = min;
+				this->freqMax[ws2812_spectrogram_horizontal] = max;
+				this->freqMin[ws2812_spectrogram_vertical] = min;
+				this->freqMax[ws2812_spectrogram_vertical] = max;
+				break;
+
+			case ws2812_oscilloscope:
+				this->freqMin[ws2812_oscilloscope] = min;
+				this->freqMax[ws2812_oscilloscope] = max;
+				break;
+
+			default:
+				break;
+			}
+		}
 	}
 }
 
@@ -2298,6 +2415,36 @@ bool GetFrequencyMinMax(int *min, int *max)
 	}
 	return false;
 }
+
+void SaveFrequencyMinMax()
+{
+	if (ws2812_global) {
+		unsigned int style;
+		int min, max;
+
+		ws2812_global->GetLineStyle(&style);
+		ws2812_global->GetFrequencyMinMax(&min, &max);
+
+		switch (style)
+		{
+		default:
+		case ws2812_spectrum_simple:
+		case ws2812_spectrum_green_red_bars:
+		case ws2812_spectrum_fire_lines:
+			SetCfgSpectrumFrequencyMinMax(min, max);
+			break;
+
+		case ws2812_spectrogram_horizontal:
+		case ws2812_spectrogram_vertical:
+			SetCfgSpectrogramFrequencyMinMax(min, max);
+			break;
+
+		case ws2812_oscilloscope:
+			break;
+		}
+	}
+}
+
 
 bool InitColorTab(const char *pattern)
 {
@@ -2524,6 +2671,7 @@ void ws2812::InitAmplitudeMinMax()
 
 void ws2812::InitFrequencyMinMax()
 {
+#if 0
 	this->freqMin[ws2812_spectrum_simple] = frequency_min;
 	this->freqMax[ws2812_spectrum_simple] = frequency_max;
 
@@ -2541,6 +2689,88 @@ void ws2812::InitFrequencyMinMax()
 
 	this->freqMin[ws2812_oscilloscope] = frequency_min;
 	this->freqMax[ws2812_oscilloscope] = frequency_max;
+#else
+	bool changed = false;
+	int min = frequency_min, max = frequency_max;
+
+	// common limits for all spectrum modes
+	GetCfgSpectrumFrequencyMinMax(&min, &max);
+
+	changed = false;
+	if (min < frequency_min) {
+		min = frequency_min;
+		changed = true;
+	}
+	if (min > frequency_max) {
+		min = frequency_max;
+		changed = true;
+	}
+	if (max < frequency_min) {
+		max = frequency_min;
+		changed = true;
+	}
+	if (max > frequency_max) {
+		max = frequency_max;
+		changed = true;
+	}
+	if (min > max) {
+		min = max;
+		changed = true;
+	}
+
+	if (changed)
+		SetCfgSpectrumFrequencyMinMax(min, max);
+
+	this->freqMin[ws2812_spectrum_simple] = min;
+	this->freqMax[ws2812_spectrum_simple] = max;
+
+	this->freqMin[ws2812_spectrum_green_red_bars] = min;
+	this->freqMax[ws2812_spectrum_green_red_bars] = max;
+
+	this->freqMin[ws2812_spectrum_fire_lines] = min;
+	this->freqMax[ws2812_spectrum_fire_lines] = max;
+
+
+	// common limits for all spectrogram modes
+	GetCfgSpectrogramFrequencyMinMax(&min, &max);
+
+	changed = false;
+	if (min < frequency_min) {
+		min = frequency_min;
+		changed = true;
+	}
+	if (min > frequency_max) {
+		min = frequency_max;
+		changed = true;
+	}
+	if (max < frequency_min) {
+		max = frequency_min;
+		changed = true;
+	}
+	if (max > frequency_max) {
+		max = frequency_max;
+		changed = true;
+	}
+	if (min > max) {
+		min = max;
+		changed = true;
+	}
+
+	if (changed)
+		SetCfgSpectrogramFrequencyMinMax(min, max);
+
+	this->freqMin[ws2812_spectrogram_horizontal] = min;
+	this->freqMax[ws2812_spectrogram_horizontal] = max;
+
+	this->freqMin[ws2812_spectrogram_vertical] = min;
+	this->freqMax[ws2812_spectrogram_vertical] = max;
+
+
+	// oscilloscope
+	this->freqMin[ws2812_oscilloscope] = frequency_min;
+	this->freqMax[ws2812_oscilloscope] = frequency_max;
+
+#endif
 }
 
 

@@ -52,6 +52,14 @@ static const GUID guid_cfg_spectrogram_ampl_max = { 0x1ef1856e, 0xdbd6, 0x4b06,{
 static const GUID guid_cfg_oscilloscope_ampl_min = { 0x986aef83, 0x3597, 0x4643,{ 0xaf, 0x91, 0x30, 0xfe, 0x49, 0x60, 0x3f, 0xa2 } };
 // {98275E99-75F1-4E8C-845A-165080F40A9F}
 static const GUID guid_cfg_oscilloscope_ampl_max = { 0x98275e99, 0x75f1, 0x4e8c,{ 0x84, 0x5a, 0x16, 0x50, 0x80, 0xf4, 0xa, 0x9f } };
+// {74F6E873-A006-453B-91BE-D94262708142}
+static const GUID guid_cfg_spectrum_freq_min = { 0x74f6e873, 0xa006, 0x453b,{ 0x91, 0xbe, 0xd9, 0x42, 0x62, 0x70, 0x81, 0x42 } };
+// {5DD613E0-C796-4075-81EB-343F33B95217}
+static const GUID guid_cfg_spectrum_freq_max = { 0x5dd613e0, 0xc796, 0x4075,{ 0x81, 0xeb, 0x34, 0x3f, 0x33, 0xb9, 0x52, 0x17 } };
+// {82924D91-2EBC-48C0-AE88-6E2EC8BB46A4}
+static const GUID guid_cfg_spectrogram_freq_min = { 0x82924d91, 0x2ebc, 0x48c0,{ 0xae, 0x88, 0x6e, 0x2e, 0xc8, 0xbb, 0x46, 0xa4 } };
+// {3C273D16-C12B-4FA6-9C8F-D3BD04AAFDF5}
+static const GUID guid_cfg_spectrogram_freq_max = { 0x3c273d16, 0xc12b, 0x4fa6,{ 0x9c, 0x8f, 0xd3, 0xbd, 0x4, 0xaa, 0xfd, 0xf5 } };
 
 
 // This GUID identifies our Advanced Preferences branch (replace with your own when reusing code).
@@ -84,6 +92,12 @@ enum {
 
 	default_cfg_oscilloscope_ampl_min = -100,
 	default_cfg_oscilloscope_ampl_max = 100,
+
+	default_cfg_spectrum_freq_min = 0,
+	default_cfg_spectrum_freq_max = 22050,
+
+	default_cfg_spectrogram_freq_min = 0,
+	default_cfg_spectrogram_freq_max = 22050,
 
 	default_cfg_bogoSetting3 = 42,
 };
@@ -129,6 +143,12 @@ static cfg_int cfg_spectrogramAmplMax(guid_cfg_spectrogram_ampl_max, default_cfg
 
 static cfg_int cfg_oscilloscopeAmplMin(guid_cfg_oscilloscope_ampl_min, default_cfg_oscilloscope_ampl_min);
 static cfg_int cfg_oscilloscopeAmplMax(guid_cfg_oscilloscope_ampl_max, default_cfg_oscilloscope_ampl_max);
+
+static cfg_int cfg_spectrumFreqMin(guid_cfg_spectrum_freq_min, default_cfg_spectrum_freq_min);
+static cfg_int cfg_spectrumFreqMax(guid_cfg_spectrum_freq_max, default_cfg_spectrum_freq_max);
+
+static cfg_int cfg_spectrogramFreqMin(guid_cfg_spectrogram_freq_min, default_cfg_spectrogram_freq_min);
+static cfg_int cfg_spectrogramFreqMax(guid_cfg_spectrogram_freq_max, default_cfg_spectrogram_freq_max);
 
 static cfg_string cfg_spectrumColors(guid_cfg_spectrum_colors, default_cfg_spectrumColors);
 static cfg_string cfg_spectrumBarColors(guid_cfg_spectrum_bar_colors, default_cfg_spectrumBarColors);
@@ -584,6 +604,24 @@ void GetCfgOscilloscopeAmplitudeMinMax(int *min, int *max)
 		*max = cfg_oscilloscopeAmplMax;
 }
 
+void GetCfgSpectrumFrequencyMinMax(int *min, int *max)
+{
+	if (min)
+		*min = cfg_spectrumFreqMin;
+	if (max)
+		*max = cfg_spectrumFreqMax;
+}
+
+void GetCfgSpectrogramFrequencyMinMax(int *min, int *max)
+{
+	if (min)
+		*min = cfg_spectrogramFreqMin;
+	if (max)
+		*max = cfg_spectrogramFreqMax;
+}
+
+
+
 bool SetCfgComPort(unsigned int value)
 {
 	if (cfg_comPort != value) {
@@ -712,9 +750,10 @@ bool SetCfgSpectrumAmplitudeMinMax(int min, int max)
 	changed |= (cfg_spectrumAmplMin != min);
 	changed |= (cfg_spectrumAmplMax != max);
 
-	cfg_spectrumAmplMin = min;
-	cfg_spectrumAmplMax = max;
-
+	if (changed) {
+		cfg_spectrumAmplMin = min;
+		cfg_spectrumAmplMax = max;
+	}
 	return changed;
 }
 
@@ -725,11 +764,11 @@ bool SetCfgSpectrogramAmplitudeMinMax(int min, int max)
 	changed |= (cfg_spectrogramAmplMin != min);
 	changed |= (cfg_spectrogramAmplMax != max);
 
-	cfg_spectrogramAmplMin = min;
-	cfg_spectrogramAmplMax = max;
-
+	if (changed) {
+		cfg_spectrogramAmplMin = min;
+		cfg_spectrogramAmplMax = max;
+	}
 	return changed;
-
 }
 
 bool SetCfgOscilloscopeAmplitudeMinMax(int min, int max)
@@ -739,9 +778,37 @@ bool SetCfgOscilloscopeAmplitudeMinMax(int min, int max)
 	changed |= (cfg_oscilloscopeAmplMin != min);
 	changed |= (cfg_oscilloscopeAmplMax != max);
 
-	cfg_oscilloscopeAmplMin = min;
-	cfg_oscilloscopeAmplMax = max;
-
+	if (changed) {
+		cfg_oscilloscopeAmplMin = min;
+		cfg_oscilloscopeAmplMax = max;
+	}
 	return changed;
+}
 
+bool SetCfgSpectrumFrequencyMinMax(int min, int max)
+{
+	bool changed = false;
+
+	changed |= (cfg_spectrumFreqMin != min);
+	changed |= (cfg_spectrumFreqMax != max);
+
+	if (changed) {
+		cfg_spectrumFreqMin = min;
+		cfg_spectrumFreqMax = max;
+	}
+	return changed;
+}
+
+bool SetCfgSpectrogramFrequencyMinMax(int min, int max)
+{
+	bool changed = false;
+
+	changed |= (cfg_spectrogramFreqMin != min);
+	changed |= (cfg_spectrogramFreqMax != max);
+
+	if (changed) {
+		cfg_spectrogramFreqMin = min;
+		cfg_spectrogramFreqMax = max;
+	}
+	return changed;
 }

@@ -233,6 +233,7 @@ bool SetAmplitudeMinMax(int min, int max);
 bool SetFrequencyMinMax(int min, int max);
 
 void SaveAmplitudeMinMax();
+void SaveFrequencyMinMax();
 
 bool SetComPort(unsigned int port);
 
@@ -276,6 +277,8 @@ const char * GetCfgOscilloscopeColors();
 void GetCfgSpectrumAmplitudeMinMax(int *min, int *max);
 void GetCfgSpectrogramAmplitudeMinMax(int *min, int *max);
 void GetCfgOscilloscopeAmplitudeMinMax(int *min, int *max);
+void GetCfgSpectrumFrequencyMinMax(int *min, int *max);
+void GetCfgSpectrogramFrequencyMinMax(int *min, int *max);
 
 bool SetCfgComPort(unsigned int value);
 bool SetCfgMatrixRows(unsigned int value);
@@ -293,3 +296,6 @@ bool SetCfgPeakValues(unsigned int value);
 bool SetCfgSpectrumAmplitudeMinMax(int min, int max);
 bool SetCfgSpectrogramAmplitudeMinMax(int min, int max);
 bool SetCfgOscilloscopeAmplitudeMinMax(int min, int max);
+
+bool SetCfgSpectrumFrequencyMinMax(int min, int max);
+bool SetCfgSpectrogramFrequencyMinMax(int min, int max);
