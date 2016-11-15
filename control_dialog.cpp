@@ -222,6 +222,9 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 		SetDlgItemText(IDC_TXT_FREQ_MIN, text);
 
 		SetFrequencyMinMax(val, INT_MAX);
+
+		if (nSBCode != TB_THUMBTRACK)
+			SaveFrequencyMinMax();
 	}
 	else if (hwnd == m_slider_freq_max) {
 		int val = m_slider_freq_max.GetPos();
@@ -229,6 +232,9 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 		SetDlgItemText(IDC_TXT_FREQ_MAX, text);
 
 		SetFrequencyMinMax(INT_MIN, val);
+
+		if (nSBCode != TB_THUMBTRACK)
+			SaveFrequencyMinMax();
 	}
 	else if (hwnd == m_slider_ampl_min) {
 		int val = m_slider_ampl_min.GetPos();
@@ -366,6 +372,10 @@ void CWS2812ControlDialog::OnStyleClicked(UINT code, int id, CWindow hwnd)
 
 			_stprintf_s(text, L"%s: %.2f", m_text_ampl_max, (double)amax / 100.0);
 			SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+
+			// frequency limits not applicable
+			m_slider_freq_min.EnableWindow(false);
+			m_slider_freq_max.EnableWindow(false);
 		}
 		else {
 			m_slider_ampl_min.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
@@ -381,6 +391,10 @@ void CWS2812ControlDialog::OnStyleClicked(UINT code, int id, CWindow hwnd)
 
 			_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, amax);
 			SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+
+			// frequency limits enabled
+			m_slider_freq_min.EnableWindow(true);
+			m_slider_freq_max.EnableWindow(true);
 		}
 	}
 
@@ -527,7 +541,7 @@ BOOL CWS2812ControlDialog::OnInitDialog(CWindow, LPARAM) {
 	_stprintf_s(text, L"%s: %u %%", m_text_brightness, val);
 	SetDlgItemText(IDC_TXT_BRIGHTNESS, text);
 
-	// FIXME frequency and amplitude scaling
+	// frequency and amplitude scaling
 	int fmin = 0, fmax = 0;
 	GetFrequencyMinMax(&fmin, &fmax);
 
@@ -563,6 +577,10 @@ BOOL CWS2812ControlDialog::OnInitDialog(CWindow, LPARAM) {
 
 		_stprintf_s(text, L"%s: %.2f", m_text_ampl_max, (double)amax / 100.0);
 		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+
+		// frequency limits not applicable
+		m_slider_freq_min.EnableWindow(false);
+		m_slider_freq_max.EnableWindow(false);
 	}
 	else {
 		m_slider_ampl_min.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
@@ -578,6 +596,10 @@ BOOL CWS2812ControlDialog::OnInitDialog(CWindow, LPARAM) {
 
 		_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, amax);
 		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+
+		// frequency limits enabled
+		m_slider_freq_min.EnableWindow(true);
+		m_slider_freq_max.EnableWindow(true);
 	}
 
 	if (GetOutputState()) {
