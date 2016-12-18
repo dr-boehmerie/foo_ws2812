@@ -9,14 +9,14 @@
 
 enum line_style
 {
-	ws2812_spectrum_simple = 0,
-	ws2812_spectrum_green_red_bars,
-	ws2812_spectrum_fire_lines,
+	ws2812_spectrum_simple = 0,			// simple white bars
+	ws2812_spectrum_green_red_bars,		// bars from green to red, each row a seperate color
+	ws2812_spectrum_fire_lines,			// bars from green to red, peak color applied to the whole bar
 
-	ws2812_spectrogram_horizontal,
-	ws2812_spectrogram_vertical,
+	ws2812_spectrogram_horizontal,		// spectrogram, moving horizontally
+	ws2812_spectrogram_vertical,		// spectrogram, moving vertically
 
-	ws2812_oscilloscope,
+	ws2812_oscilloscope,				// oscilloscope, single colored
 
 	ws2812_line_style_no
 };
@@ -157,8 +157,11 @@ public:
 	static const int			amplitude_min = -100;
 	static const int			amplitude_max = 10;
 
-	static const int			amplitude_oscilloscope_min = -100;
-	static const int			amplitude_oscilloscope_max = 100;
+	static const int			amplitude_oscilloscope_min = 10;	// => 0.1
+	static const int			amplitude_oscilloscope_max = 100;	// => 1.0
+
+	static const int			offset_oscilloscope_min = -100;		// => -1.0
+	static const int			offset_oscilloscope_max = 100;		// => 1.0
 
 	// green > red
 	const unsigned int	spectrumColorTab[3] = { MAKE_COLOR(0, 255, 0), MAKE_COLOR(200, 200, 0), MAKE_COLOR(255, 0, 0) };
@@ -276,7 +279,7 @@ const char * GetCfgSpectrogramColors();
 const char * GetCfgOscilloscopeColors();
 void GetCfgSpectrumAmplitudeMinMax(int *min, int *max);
 void GetCfgSpectrogramAmplitudeMinMax(int *min, int *max);
-void GetCfgOscilloscopeAmplitudeMinMax(int *min, int *max);
+void GetCfgOscilloscopeOffsetAmplitude(int *min, int *max);
 void GetCfgSpectrumFrequencyMinMax(int *min, int *max);
 void GetCfgSpectrogramFrequencyMinMax(int *min, int *max);
 
@@ -295,7 +298,7 @@ bool SetCfgPeakValues(unsigned int value);
 
 bool SetCfgSpectrumAmplitudeMinMax(int min, int max);
 bool SetCfgSpectrogramAmplitudeMinMax(int min, int max);
-bool SetCfgOscilloscopeAmplitudeMinMax(int min, int max);
+bool SetCfgOscilloscopeOffsetAmplitude(int offset, int amplitude);
 
 bool SetCfgSpectrumFrequencyMinMax(int min, int max);
 bool SetCfgSpectrogramFrequencyMinMax(int min, int max);

@@ -367,86 +367,16 @@ void ws2812::InitIndexLut(void)
 
 unsigned int ws2812::LedIndex(unsigned int row, unsigned int col)
 {
-#if 0
-	unsigned int	result = 0;
-
-	switch (ledMode)
-	{
-	case ws2812_led_mode_top_left_common:			// Top Left, Common direction left to right
-		result = row * columns + col;
-		break;
-
-	case ws2812_led_mode_top_right_common:			// Top Right, Common direction right to left
-		result = row * columns + (columns - 1 - col);
-		break;
-
-	case ws2812_led_mode_bottom_left_common:		// Bottom Left, Common direction left to right
-		result = (rows - 1 - row) * columns + col;
-		break;
-
-	case ws2812_led_mode_bottom_right_common:		// Bottom Right, Common direction right to left
-		result = (rows - 1 - row) * columns + (columns - 1 - col);
-		break;
-
-	case ws2812_led_mode_top_left_alternating:		// Top Left, Alternating direction left to right/right to left
-		if ((row & 1) == 0) {
-			// even row: left to right
-			result = row * columns + col;
-		}
-		else {
-			// odd row: right to left
-			result = row * columns + (columns - 1 - col);
-		}
-		break;
-
-	case ws2812_led_mode_top_right_alternating:		// Top Right, Alternating direction right to left/left to right
-		if ((row & 1) != 0) {
-			// odd row: left to right
-			result = row * columns + col;
-		}
-		else {
-			// even row: right to left
-			result = row * columns + (columns - 1 - col);
-		}
-		break;
-
-	case ws2812_led_mode_bottom_left_alternating:	// Bottom Left, Alternating direction left to right/right to left
-		if ((row & 1) == (rows & 1)) {
-			// last row, second next to last and so on: left to right
-			result = (rows - 1 - row) * columns + col;
-		}
-		else {
-			// other row: right to left
-			result = (rows - 1 - row) * columns + (columns - 1 - col);
-		}
-		break;
-
-	case ws2812_led_mode_bottom_right_alternating:	// Bottom Right, Alternating right to left/direction left to right
-		if ((row & 1) == (rows & 1)) {
-			// last row, second next to last and so on: right to left
-			result = (rows - 1 - row) * columns + (columns - 1 - col);
-		}
-		else {
-			// other row: left to right
-			result = (rows - 1 - row) * columns + col;
-		}
-		break;
-	}
-
-	// smaller than 0 will overflow and be filtered out, hopefully
-	if (result < rows * columns)
-		return result;
-
-	return 0;
-#else
 	// use prebuilt lut
-	return indexLut[row * columns + col];
-#endif
+	if (indexLut == nullptr)
+		return 0;
+	else
+		return indexLut[row * columns + col];
 }
 
 void ws2812::CalcColorSimple(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
 {
-	if ((audio_sample)row > sample) {
+	if (colorTab == nullptr || (audio_sample)row > sample) {
 		// off
 		r = g = b = 0;
 	}
@@ -505,113 +435,104 @@ void ws2812::CalcColor(audio_sample sample, audio_sample min, unsigned int &r, u
 
 void ws2812::CalcRowColor(audio_sample row, unsigned int &r, unsigned int &g, unsigned int &b)
 {
-#if 0
-	audio_sample	row_max = (audio_sample)rows - 1;
-	audio_sample	r_start, g_start, b_start;
-	audio_sample	r_end, g_end, b_end;
+	if (colorTab != nullptr) {
+		// use color table
+		unsigned int	tabIdx;
+		audio_sample	m, n;
 
-	// green
-	r_start = 0; g_start = 255; b_start = 0;
-	// to red
-	r_end = 255; g_end = 0; b_end = 0;
+		m = (audio_sample)colorNo / (audio_sample)rows;
+		n = 0;	// (audio_sample)colorNo - (audio_sample)rows * m;
 
-	// row = 0 to (rows - 1) => green to red via yellow
-	row = row / row_max;
-	if (row < 0.0) {
-		r_end = r_start;
-		g_end = g_start;
-		b_end = b_start;
-	}
-	else if (row < 1.0) {
-		r_end = row * (r_end - r_start) + r_start;
-		g_end = row * (g_end - g_start) + g_start;
-		b_end = row * (b_end - b_start) + b_start;
-	}
-	r = (unsigned int)r_end;
-	g = (unsigned int)g_end;
-	b = (unsigned int)b_end;
-#else
-	// use color table
-	unsigned int	tabIdx;
-	audio_sample	m, n;
-
-	m = (audio_sample)colorNo / (audio_sample)rows;
-	n = 0;	// (audio_sample)colorNo - (audio_sample)rows * m;
-
-	if (row >= (audio_sample)rows) {
-		tabIdx = colorNo - 1;
-	}
-	else if (row <= (audio_sample)0.0) {
-		tabIdx = 0;
+		if (row >= (audio_sample)rows) {
+			tabIdx = colorNo - 1;
+		}
+		else if (row <= (audio_sample)0.0) {
+			tabIdx = 0;
+		}
+		else {
+			tabIdx = (unsigned int)floor(row * m + n);
+		}
+		r = GET_COLOR_R(colorTab[tabIdx]);
+		g = GET_COLOR_G(colorTab[tabIdx]);
+		b = GET_COLOR_B(colorTab[tabIdx]);
 	}
 	else {
-		tabIdx = (unsigned int)floor(row * m + n);
+		// off
+		r = g = b = 0;
 	}
-	r = GET_COLOR_R(colorTab[tabIdx]);
-	g = GET_COLOR_G(colorTab[tabIdx]);
-	b = GET_COLOR_B(colorTab[tabIdx]);
-#endif
 }
 
 void ws2812::CalcColorColoredRows(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
 {
-	unsigned int	peak = (unsigned int)round(sample);
+	if (sample >= 0.0) {
+		unsigned int	peak = (unsigned int)round(sample);
 
-	if (row > peak) {
-		// off
-		r = g = b = 0;
-	}
-	else if (row == peak) {
-		// peak
-		CalcRowColor((audio_sample)row, r, g, b);
+		if (row > peak) {
+			// off
+			r = g = b = 0;
+		}
+		else if (row == peak) {
+			// peak
+			CalcRowColor((audio_sample)row, r, g, b);
+		}
+		else {
+			// between
+			CalcRowColor((audio_sample)row, r, g, b);
+
+			if (1) {
+				// reduce brightness
+				r /= 4;
+				g /= 4;
+				b /= 4;
+			}
+			else if (0) {
+				// reduce brightness
+				r /= 2;
+				g /= 2;
+				b /= 2;
+			}
+		}
 	}
 	else {
-		// between
-		CalcRowColor((audio_sample)row, r, g, b);
-
-		if (1) {
-			// reduce brightness
-			r /= 4;
-			g /= 4;
-			b /= 4;
-		}
-		else if (0) {
-			// reduce brightness
-			r /= 2;
-			g /= 2;
-			b /= 2;
-		}
+		// off
+		r = g = b = 0;
 	}
 }
 
 void ws2812::CalcColorColoredBars(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
 {
-	unsigned int	peak = (unsigned int)round(sample);
+	if (sample >= 0.0) {
+		unsigned int	peak = (unsigned int)round(sample);
 
-	if (row > peak) {
-		// off
-		r = g = b = 0;
-	}
-	else if (row == peak) {
-		// peak
-		CalcRowColor(sample, r, g, b);
+		if (row > peak) {
+			// off
+			r = g = b = 0;
+		}
+		else if (row == peak) {
+			// peak
+			CalcRowColor(sample, r, g, b);
+		}
+		else {
+			// between
+			CalcRowColor(sample, r, g, b);
+
+			if (0) {
+				// reduce brightness
+				r /= 4;
+				g /= 4;
+				b /= 4;
+			}
+			else if (1) {
+				// reduce brightness
+				r /= 2;
+				g /= 2;
+				b /= 2;
+			}
+		}
 	}
 	else {
-		// between
-		CalcRowColor(sample, r, g, b);
-
-		if (0) {
-			// reduce brightness
-			r /= 4;
-			g /= 4;
-			b /= 4;
-		}
-		else if (1) {
-			// reduce brightness
-			r /= 2;
-			g /= 2;
-			b /= 2;
-		}
+		// off
+		r = g = b = 0;
 	}
 }
 
@@ -696,34 +617,38 @@ void ws2812::AddPersistenceSpectrum(unsigned int led_index, unsigned int &r, uns
 {
 	unsigned int	p_r, p_g, p_b;
 
-	p_r = persistenceBuffer[3 * led_index + 0];
-	p_g = persistenceBuffer[3 * led_index + 1];
-	p_b = persistenceBuffer[3 * led_index + 2];
+	if (persistenceBuffer != nullptr) {
+		p_r = persistenceBuffer[3 * led_index + 0];
+		p_g = persistenceBuffer[3 * led_index + 1];
+		p_b = persistenceBuffer[3 * led_index + 2];
 
-	CalcPersistenceMax(r, p_r);
-	CalcPersistenceMax(g, p_g);
-	CalcPersistenceMax(b, p_b);
+		CalcPersistenceMax(r, p_r);
+		CalcPersistenceMax(g, p_g);
+		CalcPersistenceMax(b, p_b);
 
-	persistenceBuffer[3 * led_index + 0] = p_r;
-	persistenceBuffer[3 * led_index + 1] = p_g;
-	persistenceBuffer[3 * led_index + 2] = p_b;
+		persistenceBuffer[3 * led_index + 0] = p_r;
+		persistenceBuffer[3 * led_index + 1] = p_g;
+		persistenceBuffer[3 * led_index + 2] = p_b;
+	}
 }
 
 void ws2812::AddPersistenceOscilloscope(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b)
 {
 	unsigned int	p_r, p_g, p_b;
 
-	p_r = persistenceBuffer[3 * led_index + 0];
-	p_g = persistenceBuffer[3 * led_index + 1];
-	p_b = persistenceBuffer[3 * led_index + 2];
+	if (persistenceBuffer != nullptr) {
+		p_r = persistenceBuffer[3 * led_index + 0];
+		p_g = persistenceBuffer[3 * led_index + 1];
+		p_b = persistenceBuffer[3 * led_index + 2];
 
-	CalcPersistenceAdd(r, p_r);
-	CalcPersistenceAdd(g, p_g);
-	CalcPersistenceAdd(b, p_b);
+		CalcPersistenceAdd(r, p_r);
+		CalcPersistenceAdd(g, p_g);
+		CalcPersistenceAdd(b, p_b);
 
-	persistenceBuffer[3 * led_index + 0] = p_r;
-	persistenceBuffer[3 * led_index + 1] = p_g;
-	persistenceBuffer[3 * led_index + 2] = p_b;
+		persistenceBuffer[3 * led_index + 0] = p_r;
+		persistenceBuffer[3 * led_index + 1] = p_g;
+		persistenceBuffer[3 * led_index + 2] = p_b;
+	}
 }
 
 
@@ -748,6 +673,8 @@ void ws2812::ColorsToBuffer(unsigned char *buffer, unsigned int led_index, unsig
 	buffer[3 * led_index + 1] = (unsigned char)r;
 	buffer[3 * led_index + 2] = (unsigned char)b;
 }
+
+
 
 void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer)
 {
@@ -780,8 +707,8 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 	bar_cnt = cols;
 
 	// limits
-	db_max = (audio_sample)this->amplMax[this->lineStyle];	//-10;
-	db_min = (audio_sample)this->amplMin[this->lineStyle];	//(audio_sample)-10 * (audio_sample)rows;
+	db_max = (audio_sample)this->amplMax[this->lineStyle];
+	db_min = (audio_sample)this->amplMin[this->lineStyle];
 
 	if (db_max <= db_min) {
 		// invalid values
@@ -1054,6 +981,8 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 	}
 }
 
+
+
 void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer)
 {
 	unsigned int	rows = this->rows;
@@ -1091,8 +1020,8 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 	}
 
 	// limits
-	db_max = (audio_sample)this->amplMax[this->lineStyle];	// -5;
-	db_min = (audio_sample)this->amplMin[this->lineStyle];	//-40;
+	db_max = (audio_sample)this->amplMax[this->lineStyle];
+	db_min = (audio_sample)this->amplMin[this->lineStyle];
 
 	if (db_max <= db_min) {
 		// invalid values
@@ -1331,34 +1260,26 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 		// increase max frequency for the next bar
 		bar_freq *= f_mult;
 
-#if 0
-		// calc height of bar in rows
-		// -10 db is max, -80 is min
-		// -10 db is 1.0, -80 is 0
-		if (sample >= db_max) {
-			// limit
-			sample = 1.0;
-		}
-		else {
+		if (colorTab != nullptr) {
+			// use colorTab
 			sample = sample * m + n;
-		}
-		CalcColor(sample, min, r, g, b);
-#else
-		// use colorTab
-		sample = sample * m + n;
-		if (sample < 0) {
-			i = 0;
-		}
-		else if (sample < (audio_sample)colorNo) {
-			i = (unsigned int)floorf(sample + 0.5f);
+			if (sample < 0) {
+				i = 0;
+			}
+			else if (sample < (audio_sample)colorNo) {
+				i = (unsigned int)floorf(sample + 0.5f);
+			}
+			else {
+				i = colorNo - 1;
+			}
+			r = GET_COLOR_R(colorTab[i]);
+			g = GET_COLOR_G(colorTab[i]);
+			b = GET_COLOR_B(colorTab[i]);
 		}
 		else {
-			i = colorNo - 1;
+			r = g = b = 0;
 		}
-		r = GET_COLOR_R(colorTab[i]);
-		g = GET_COLOR_G(colorTab[i]);
-		b = GET_COLOR_B(colorTab[i]);
-#endif
+
 		if (lineStyle == ws2812_spectrogram_horizontal) {
 			// spectrum in last col, invert Y axis
 			row = bar_cnt - 1 - bar;
@@ -1376,6 +1297,8 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 	}
 }
 
+
+
 void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int samples, unsigned int samplerate, audio_sample peak, unsigned char * buffer)
 {
 	unsigned int	rows = this->rows;
@@ -1388,6 +1311,7 @@ void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int sampl
 	unsigned int	r, g, b, i;
 	unsigned int	max_cnt;
 	audio_sample	sample;
+	audio_sample	offset;
 	audio_sample	val_max;
 	audio_sample	val_min;
 	audio_sample	m, n;
@@ -1396,8 +1320,9 @@ void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int sampl
 	unsigned int	max_wfm;
 
 	// scale waveform
-	val_max = (audio_sample)this->amplMax[this->lineStyle];	// 1.0;
-	val_min = (audio_sample)this->amplMin[this->lineStyle];	// -1.0;
+	offset = (audio_sample)this->amplMin[this->lineStyle] / 100;	// -1.0 ... 1.0
+	val_max = (audio_sample)this->amplMax[this->lineStyle];			// 10 ... 100
+	val_min = -1 * val_max;											// -10 ... -100
 
 	// scale amplitude_oscilloscope_min ... amplitude_oscilloscope_max to -1 ... 1
 	m = (audio_sample)(1.0 - (-1.0)) / (audio_sample)(amplitude_oscilloscope_max - amplitude_oscilloscope_min);
@@ -1435,6 +1360,9 @@ void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int sampl
 	i = 0;
 	for (sample_index = 0; sample_index < samples; sample_index++) {
 		sample = psample[sample_index];
+
+		// offset (-1.0 ... 1.0)
+		sample += offset;
 
 		// sample to row
 		sample = sample * m + n;
@@ -2311,7 +2239,7 @@ void SaveAmplitudeMinMax()
 			break;
 
 		case ws2812_oscilloscope:
-			SetCfgOscilloscopeAmplitudeMinMax(min, max);
+			SetCfgOscilloscopeOffsetAmplitude(min, max);
 			break;
 		}
 	}
@@ -2536,26 +2464,6 @@ void ws2812::ClearLedBuffer(unsigned char *buffer)
 
 void ws2812::InitAmplitudeMinMax()
 {
-#if 0
-	this->amplMin[ws2812_spectrum_simple] = -50;
-	this->amplMax[ws2812_spectrum_simple] = -15;
-
-	this->amplMin[ws2812_spectrum_green_red_bars] = -50;
-	this->amplMax[ws2812_spectrum_green_red_bars] = -15;
-
-	this->amplMin[ws2812_spectrum_fire_lines] = -50;
-	this->amplMax[ws2812_spectrum_fire_lines] = -10;
-
-	this->amplMin[ws2812_spectrogram_horizontal] = -40;
-	this->amplMax[ws2812_spectrogram_horizontal] = -5;
-
-	this->amplMin[ws2812_spectrogram_vertical] = -40;
-	this->amplMax[ws2812_spectrogram_vertical] = -5;
-
-	this->amplMin[ws2812_oscilloscope] = amplitude_min;
-	this->amplMax[ws2812_oscilloscope] = amplitude_max;
-
-#else
 	bool changed = false;
 	int min = amplitude_min, max = amplitude_max;
 
@@ -2631,20 +2539,20 @@ void ws2812::InitAmplitudeMinMax()
 	this->amplMin[ws2812_spectrogram_vertical] = min;
 	this->amplMax[ws2812_spectrogram_vertical] = max;
 
-	min = amplitude_oscilloscope_min;
+
+	min = (offset_oscilloscope_max - offset_oscilloscope_max) / 2;
 	max = amplitude_oscilloscope_max;
 
-
 	// oscilloscope
-	GetCfgOscilloscopeAmplitudeMinMax(&min, &max);
+	GetCfgOscilloscopeOffsetAmplitude(&min, &max);
 
 	changed = false;
-	if (min < amplitude_oscilloscope_min) {
-		min = amplitude_oscilloscope_min;
+	if (min < offset_oscilloscope_min) {
+		min = offset_oscilloscope_min;
 		changed = true;
 	}
-	if (min > amplitude_oscilloscope_max) {
-		min = amplitude_oscilloscope_max;
+	if (min > offset_oscilloscope_max) {
+		min = offset_oscilloscope_max;
 		changed = true;
 	}
 	if (max < amplitude_oscilloscope_min) {
@@ -2661,35 +2569,14 @@ void ws2812::InitAmplitudeMinMax()
 	}
 
 	if (changed)
-		SetCfgOscilloscopeAmplitudeMinMax(min, max);
+		SetCfgOscilloscopeOffsetAmplitude(min, max);
 
 	this->amplMin[ws2812_oscilloscope] = min;
 	this->amplMax[ws2812_oscilloscope] = max;
-
-#endif
 }
 
 void ws2812::InitFrequencyMinMax()
 {
-#if 0
-	this->freqMin[ws2812_spectrum_simple] = frequency_min;
-	this->freqMax[ws2812_spectrum_simple] = frequency_max;
-
-	this->freqMin[ws2812_spectrum_green_red_bars] = frequency_min;
-	this->freqMax[ws2812_spectrum_green_red_bars] = frequency_max;
-
-	this->freqMin[ws2812_spectrum_fire_lines] = frequency_min;
-	this->freqMax[ws2812_spectrum_fire_lines] = frequency_max;
-
-	this->freqMin[ws2812_spectrogram_horizontal] = frequency_min;
-	this->freqMax[ws2812_spectrogram_horizontal] = frequency_max;
-
-	this->freqMin[ws2812_spectrogram_vertical] = frequency_min;
-	this->freqMax[ws2812_spectrogram_vertical] = frequency_max;
-
-	this->freqMin[ws2812_oscilloscope] = frequency_min;
-	this->freqMax[ws2812_oscilloscope] = frequency_max;
-#else
 	bool changed = false;
 	int min = frequency_min, max = frequency_max;
 
@@ -2769,8 +2656,6 @@ void ws2812::InitFrequencyMinMax()
 	// oscilloscope
 	this->freqMin[ws2812_oscilloscope] = frequency_min;
 	this->freqMax[ws2812_oscilloscope] = frequency_max;
-
-#endif
 }
 
 

@@ -49,9 +49,9 @@ static const GUID guid_cfg_spectrogram_ampl_min = { 0xde0564d4, 0x631c, 0x49ff,{
 // {1EF1856E-DBD6-4B06-B89A-C09B842EC362}
 static const GUID guid_cfg_spectrogram_ampl_max = { 0x1ef1856e, 0xdbd6, 0x4b06,{ 0xb8, 0x9a, 0xc0, 0x9b, 0x84, 0x2e, 0xc3, 0x62 } };
 // {986AEF83-3597-4643-AF91-30FE49603FA2}
-static const GUID guid_cfg_oscilloscope_ampl_min = { 0x986aef83, 0x3597, 0x4643,{ 0xaf, 0x91, 0x30, 0xfe, 0x49, 0x60, 0x3f, 0xa2 } };
+static const GUID guid_cfg_oscilloscope_offset = { 0x986aef83, 0x3597, 0x4643,{ 0xaf, 0x91, 0x30, 0xfe, 0x49, 0x60, 0x3f, 0xa2 } };
 // {98275E99-75F1-4E8C-845A-165080F40A9F}
-static const GUID guid_cfg_oscilloscope_ampl_max = { 0x98275e99, 0x75f1, 0x4e8c,{ 0x84, 0x5a, 0x16, 0x50, 0x80, 0xf4, 0xa, 0x9f } };
+static const GUID guid_cfg_oscilloscope_amplitude = { 0x98275e99, 0x75f1, 0x4e8c,{ 0x84, 0x5a, 0x16, 0x50, 0x80, 0xf4, 0xa, 0x9f } };
 // {74F6E873-A006-453B-91BE-D94262708142}
 static const GUID guid_cfg_spectrum_freq_min = { 0x74f6e873, 0xa006, 0x453b,{ 0x91, 0xbe, 0xd9, 0x42, 0x62, 0x70, 0x81, 0x42 } };
 // {5DD613E0-C796-4075-81EB-343F33B95217}
@@ -90,8 +90,8 @@ enum {
 	default_cfg_spectrogram_ampl_min = -40,
 	default_cfg_spectrogram_ampl_max = -5,
 
-	default_cfg_oscilloscope_ampl_min = -100,
-	default_cfg_oscilloscope_ampl_max = 100,
+	default_cfg_oscilloscope_offset = 0,
+	default_cfg_oscilloscope_amplitude = 100,
 
 	default_cfg_spectrum_freq_min = 0,
 	default_cfg_spectrum_freq_max = 22050,
@@ -141,8 +141,8 @@ static cfg_int cfg_spectrumAmplMax(guid_cfg_spectrum_ampl_max, default_cfg_spect
 static cfg_int cfg_spectrogramAmplMin(guid_cfg_spectrogram_ampl_min, default_cfg_spectrogram_ampl_min);
 static cfg_int cfg_spectrogramAmplMax(guid_cfg_spectrogram_ampl_max, default_cfg_spectrogram_ampl_max);
 
-static cfg_int cfg_oscilloscopeAmplMin(guid_cfg_oscilloscope_ampl_min, default_cfg_oscilloscope_ampl_min);
-static cfg_int cfg_oscilloscopeAmplMax(guid_cfg_oscilloscope_ampl_max, default_cfg_oscilloscope_ampl_max);
+static cfg_int cfg_oscilloscopeOffset(guid_cfg_oscilloscope_offset, default_cfg_oscilloscope_offset);
+static cfg_int cfg_oscilloscopeAmplitude(guid_cfg_oscilloscope_amplitude, default_cfg_oscilloscope_amplitude);
 
 static cfg_int cfg_spectrumFreqMin(guid_cfg_spectrum_freq_min, default_cfg_spectrum_freq_min);
 static cfg_int cfg_spectrumFreqMax(guid_cfg_spectrum_freq_max, default_cfg_spectrum_freq_max);
@@ -596,12 +596,12 @@ void GetCfgSpectrogramAmplitudeMinMax(int *min, int *max)
 		*max = cfg_spectrogramAmplMax;
 }
 
-void GetCfgOscilloscopeAmplitudeMinMax(int *min, int *max)
+void GetCfgOscilloscopeOffsetAmplitude(int *offset, int *amplitude)
 {
-	if (min)
-		*min = cfg_oscilloscopeAmplMin;
-	if (max)
-		*max = cfg_oscilloscopeAmplMax;
+	if (offset)
+		*offset = cfg_oscilloscopeOffset;
+	if (amplitude)
+		*amplitude = cfg_oscilloscopeAmplitude;
 }
 
 void GetCfgSpectrumFrequencyMinMax(int *min, int *max)
@@ -771,16 +771,16 @@ bool SetCfgSpectrogramAmplitudeMinMax(int min, int max)
 	return changed;
 }
 
-bool SetCfgOscilloscopeAmplitudeMinMax(int min, int max)
+bool SetCfgOscilloscopeOffsetAmplitude(int offset, int amplitude)
 {
 	bool changed = false;
 
-	changed |= (cfg_oscilloscopeAmplMin != min);
-	changed |= (cfg_oscilloscopeAmplMax != max);
+	changed |= (cfg_oscilloscopeOffset != offset);
+	changed |= (cfg_oscilloscopeAmplitude != amplitude);
 
 	if (changed) {
-		cfg_oscilloscopeAmplMin = min;
-		cfg_oscilloscopeAmplMax = max;
+		cfg_oscilloscopeOffset = offset;
+		cfg_oscilloscopeAmplitude = amplitude;
 	}
 	return changed;
 }
