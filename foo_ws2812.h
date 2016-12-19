@@ -157,8 +157,8 @@ public:
 	static const int			amplitude_min = -100;
 	static const int			amplitude_max = 10;
 
-	static const int			amplitude_oscilloscope_min = 10;	// => 0.1
-	static const int			amplitude_oscilloscope_max = 100;	// => 1.0
+	static const int			gain_oscilloscope_min = 10;			// => * 1.0
+	static const int			gain_oscilloscope_max = 100;		// => * 10.0
 
 	static const int			offset_oscilloscope_min = -100;		// => -1.0
 	static const int			offset_oscilloscope_max = 100;		// => 1.0

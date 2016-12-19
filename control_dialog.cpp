@@ -51,6 +51,8 @@ private:
 
 	void update();
 
+	void UpdateFrequencyAmplitudeSlider();
+
 //	void OnPatternChange(UINT, int, CWindow);
 	void OnCancel(UINT, int, CWindow);
 
@@ -89,6 +91,7 @@ private:
 	LPCTSTR m_text_ampl_max   = L"Max. Amplitude";
 	LPCTSTR m_text_offset     = L"Offset";
 	LPCTSTR m_text_amplitude  = L"Amplitude";
+	LPCTSTR m_text_gain       = L"Gain";
 
 	unsigned int m_interval_step = 10;
 
@@ -266,8 +269,8 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 
 		if (GetLineStyle(&style)) {
 			if (style == ws2812_oscilloscope) {
-				// this value is used as amplitude
-				_stprintf_s(text, L"%s: %.2f", m_text_amplitude, (double)val / 100.0);
+				// this value is used as gain
+				_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)val / 10.0);
 			}
 		}
 
@@ -308,6 +311,77 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 
 #endif
 
+
+void CWS2812ControlDialog::UpdateFrequencyAmplitudeSlider(void)
+{
+	WCHAR text[100];
+	int fmin = 0, fmax = 0;
+	int amin = 0, amax = 0;
+	unsigned int style = 0;
+
+	GetLineStyle(&style);
+
+	// frequency and amplitude scaling
+	GetFrequencyMinMax(&fmin, &fmax);
+
+	m_slider_freq_min.SetRange(ws2812::frequency_min, ws2812::frequency_max, TRUE);
+	m_slider_freq_min.SetTicFreq((ws2812::frequency_max - ws2812::frequency_min) / 10);
+	m_slider_freq_min.SetPos(fmin);
+
+	_stprintf_s(text, L"%s: %u Hz", m_text_freq_min, fmin);
+	SetDlgItemText(IDC_TXT_FREQ_MIN, text);
+
+	m_slider_freq_max.SetRange(ws2812::frequency_min, ws2812::frequency_max, TRUE);
+	m_slider_freq_max.SetTicFreq((ws2812::frequency_max - ws2812::frequency_min) / 10);
+	m_slider_freq_max.SetPos(fmax);
+
+	_stprintf_s(text, L"%s: %u Hz", m_text_freq_max, fmax);
+	SetDlgItemText(IDC_TXT_FREQ_MAX, text);
+
+	GetAmplitudeMinMax(&amin, &amax);
+
+	if (style == ws2812_oscilloscope) {
+		// Oscilloscope: offset: -100 ... 100 -> -1.0 ... 1.0
+		m_slider_ampl_min.SetRange(ws2812::offset_oscilloscope_min, ws2812::offset_oscilloscope_max, TRUE);
+		m_slider_ampl_min.SetTicFreq((ws2812::offset_oscilloscope_max - ws2812::offset_oscilloscope_min) / 10);
+		m_slider_ampl_min.SetPos(amin);
+
+		_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)amin / 100.0);
+		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
+
+		// gain: 10 ... 100 -> 1.0 ... 10.0
+		m_slider_ampl_max.SetRange(ws2812::gain_oscilloscope_min, ws2812::gain_oscilloscope_max, TRUE);
+		m_slider_ampl_max.SetTicFreq((ws2812::gain_oscilloscope_max - ws2812::gain_oscilloscope_min) / 10);
+		m_slider_ampl_max.SetPos(amax);
+
+		_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)amax / 10.0);
+		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+
+		// frequency limits not applicable
+		m_slider_freq_min.EnableWindow(false);
+		m_slider_freq_max.EnableWindow(false);
+	}
+	else {
+		m_slider_ampl_min.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
+		m_slider_ampl_min.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
+		m_slider_ampl_min.SetPos(amin);
+
+		_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, amin);
+		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
+
+		m_slider_ampl_max.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
+		m_slider_ampl_max.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
+		m_slider_ampl_max.SetPos(amax);
+
+		_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, amax);
+		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+
+		// frequency limits enabled
+		m_slider_freq_min.EnableWindow(true);
+		m_slider_freq_max.EnableWindow(true);
+	}
+}
+
 void CWS2812ControlDialog::OnStyleClicked(UINT code, int id, CWindow hwnd)
 {
 	LRESULT r = SendDlgItemMessage(id, BM_GETCHECK, 0, 0);
@@ -345,65 +419,10 @@ void CWS2812ControlDialog::OnStyleClicked(UINT code, int id, CWindow hwnd)
 			InitColorTab(colors);
 	}
 
-	// FIXME frequency and amplitude scaling changes
-	if (1) {
-		WCHAR text[100];
-		int fmin = 0, fmax = 0;
-		int amin = 0, amax = 0;
+	// frequency and amplitude scaling changes
+	UpdateFrequencyAmplitudeSlider();
 
-		GetFrequencyMinMax(&fmin, &fmax);
-		m_slider_freq_min.SetPos(fmin);
-		m_slider_freq_max.SetPos(fmax);
-
-		_stprintf_s(text, L"%s: %u Hz", m_text_freq_min, fmin);
-		SetDlgItemText(IDC_TXT_FREQ_MIN, text);
-
-		_stprintf_s(text, L"%s: %u Hz", m_text_freq_max, fmax);
-		SetDlgItemText(IDC_TXT_FREQ_MAX, text);
-
-		GetAmplitudeMinMax(&amin, &amax);
-
-		if (style == ws2812_oscilloscope) {
-			// Oscilloscope: -100 ... 100 -> -1.0 ... 1.0
-			m_slider_ampl_min.SetRange(ws2812::offset_oscilloscope_min, ws2812::offset_oscilloscope_max, TRUE);
-			m_slider_ampl_min.SetTicFreq((ws2812::offset_oscilloscope_max - ws2812::offset_oscilloscope_min) / 10);
-			m_slider_ampl_min.SetPos(amin);
-
-			m_slider_ampl_max.SetRange(ws2812::amplitude_oscilloscope_min, ws2812::amplitude_oscilloscope_max, TRUE);
-			m_slider_ampl_max.SetTicFreq((ws2812::amplitude_oscilloscope_max - ws2812::amplitude_oscilloscope_min) / 10);
-			m_slider_ampl_max.SetPos(amax);
-
-			_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)amin / 100.0);
-			SetDlgItemText(IDC_TXT_AMPL_MIN, text);
-
-			_stprintf_s(text, L"%s: %.2f", m_text_amplitude, (double)amax / 100.0);
-			SetDlgItemText(IDC_TXT_AMPL_MAX, text);
-
-			// frequency limits not applicable
-			m_slider_freq_min.EnableWindow(false);
-			m_slider_freq_max.EnableWindow(false);
-		}
-		else {
-			m_slider_ampl_min.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
-			m_slider_ampl_min.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
-			m_slider_ampl_min.SetPos(amin);
-
-			m_slider_ampl_max.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
-			m_slider_ampl_max.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
-			m_slider_ampl_max.SetPos(amax);
-
-			_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, amin);
-			SetDlgItemText(IDC_TXT_AMPL_MIN, text);
-
-			_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, amax);
-			SetDlgItemText(IDC_TXT_AMPL_MAX, text);
-
-			// frequency limits enabled
-			m_slider_freq_min.EnableWindow(true);
-			m_slider_freq_max.EnableWindow(true);
-		}
-	}
-
+	// save selected line style
 	if (GetLineStyle(&style))
 		SetCfgLineStyle(style);
 }
@@ -548,65 +567,7 @@ BOOL CWS2812ControlDialog::OnInitDialog(CWindow, LPARAM) {
 	SetDlgItemText(IDC_TXT_BRIGHTNESS, text);
 
 	// frequency and amplitude scaling
-	int fmin = 0, fmax = 0;
-	GetFrequencyMinMax(&fmin, &fmax);
-
-	m_slider_freq_min.SetRange(ws2812::frequency_min, ws2812::frequency_max, TRUE);
-	m_slider_freq_min.SetTicFreq((ws2812::frequency_max - ws2812::frequency_min) / 10);
-	m_slider_freq_min.SetPos(fmin);
-
-	_stprintf_s(text, L"%s: %u Hz", m_text_freq_min, fmin);
-	SetDlgItemText(IDC_TXT_FREQ_MIN, text);
-
-	m_slider_freq_max.SetRange(ws2812::frequency_min, ws2812::frequency_max, TRUE);
-	m_slider_freq_max.SetTicFreq((ws2812::frequency_max - ws2812::frequency_min) / 10);
-	m_slider_freq_max.SetPos(fmax);
-
-	_stprintf_s(text, L"%s: %u Hz", m_text_freq_max, fmax);
-	SetDlgItemText(IDC_TXT_FREQ_MAX, text);
-
-	int amin = 0, amax = 0;
-	GetAmplitudeMinMax(&amin, &amax);
-
-	if (style == ws2812_oscilloscope) {
-		// Oscilloscope: -100 ... 100 -> -1.0 ... 1.0
-		m_slider_ampl_min.SetRange(ws2812::amplitude_oscilloscope_min, ws2812::amplitude_oscilloscope_max, TRUE);
-		m_slider_ampl_min.SetTicFreq((ws2812::amplitude_oscilloscope_max - ws2812::amplitude_oscilloscope_min) / 10);
-		m_slider_ampl_min.SetPos(amin);
-
-		m_slider_ampl_max.SetRange(ws2812::amplitude_oscilloscope_min, ws2812::amplitude_oscilloscope_max, TRUE);
-		m_slider_ampl_max.SetTicFreq((ws2812::amplitude_oscilloscope_max - ws2812::amplitude_oscilloscope_min) / 10);
-		m_slider_ampl_max.SetPos(amax);
-
-		_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)amin / 100.0);
-		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
-
-		_stprintf_s(text, L"%s: %.2f", m_text_amplitude, (double)amax / 100.0);
-		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
-
-		// frequency limits not applicable
-		m_slider_freq_min.EnableWindow(false);
-		m_slider_freq_max.EnableWindow(false);
-	}
-	else {
-		m_slider_ampl_min.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
-		m_slider_ampl_min.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
-		m_slider_ampl_min.SetPos(amin);
-
-		_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, amin);
-		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
-
-		m_slider_ampl_max.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
-		m_slider_ampl_max.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
-		m_slider_ampl_max.SetPos(amax);
-
-		_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, amax);
-		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
-
-		// frequency limits enabled
-		m_slider_freq_min.EnableWindow(true);
-		m_slider_freq_max.EnableWindow(true);
-	}
+	UpdateFrequencyAmplitudeSlider();
 
 	if (GetOutputState()) {
 		// output is running

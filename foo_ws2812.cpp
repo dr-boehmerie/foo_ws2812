@@ -1307,6 +1307,7 @@ void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int sampl
 
 	unsigned int	col, row;
 	unsigned int	sample_index;
+	unsigned int	sample_min, sample_max;
 	unsigned int	led_index;
 	unsigned int	r, g, b, i;
 	unsigned int	max_cnt;
@@ -1318,37 +1319,176 @@ void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int sampl
 	audio_sample	duration;
 	unsigned int	samples_per_col;
 	unsigned int	max_wfm;
+	bool			softTrigger = this->peakValues;
 
-	// scale waveform
+	// min is offset
 	offset = (audio_sample)this->amplMin[this->lineStyle] / 100;	// -1.0 ... 1.0
-	val_max = (audio_sample)this->amplMax[this->lineStyle];			// 10 ... 100
-	val_min = -1 * val_max;											// -10 ... -100
-
+#if 0
+	val_max = (audio_sample)this->amplMax[this->lineStyle] / 100;	// 0.1 ... 1.0
+	val_min = -1 * val_max;											// -0.1 ... -1.0
+#if 0
 	// scale amplitude_oscilloscope_min ... amplitude_oscilloscope_max to -1 ... 1
 	m = (audio_sample)(1.0 - (-1.0)) / (audio_sample)(amplitude_oscilloscope_max - amplitude_oscilloscope_min);
 	n = (audio_sample)1.0 - m * (audio_sample)amplitude_oscilloscope_max;
 	val_max = val_max * m + n;
 	val_min = val_min * m + n;
-
+#endif
 	if (val_max <= val_min) {
 		// invalid values
 		ClearLedBuffer(buffer);
 		return;
 	}
+#else
+	// max is gain
+	val_max = ((audio_sample)this->amplMax[this->lineStyle] / 10);	// 1.0 ... 10.0
+	if (val_max > 0)
+		val_max = 1 / val_max;	// 0.1 ... 1.0
+	else
+		val_max = 1;
+	val_min = -1 * val_max;		// -0.1 ... -1.0
+#endif
 
 	// rows per "volt", invert Y axis
 	m = -1 * (audio_sample)rows / (val_max - val_min);
 	// center in Y
-	n = (audio_sample)(rows - 1) / 2 - 0 * m;
+	n = (audio_sample)(rows - 1) / 2;
 
-	// curve duration, determines number of samples per column
-	duration = (audio_sample)100e-3;
+	// add user offset -1.0 ... 1.0 -> - rows/2 ... + rows/2
+	offset = offset * (-1 * (audio_sample)rows / 2);
+	n += offset;
+
+	sample_min = 0;
+	sample_max = samples;
+
+	if (softTrigger) {
+		// soft trigger is on
+		audio_sample	triggerLevel = (audio_sample)0.0;
+		audio_sample	triggerHyst = (audio_sample)0.02;
+		audio_sample	triggerMin, triggerMax;
+		unsigned int	triggerStart, triggerEnd;
+		unsigned int	triggerPos[5];
+		unsigned int	triggerCnt;
+
+		triggerMin = triggerLevel - triggerHyst;
+		triggerMax = triggerLevel + triggerHyst;
+
+		triggerStart = 0;
+		triggerEnd = 0;
+		triggerCnt = 0;
+		triggerPos[0] = 0;
+		triggerPos[1] = 0;
+		triggerPos[2] = 0;
+		triggerPos[3] = 0;
+		triggerPos[4] = 0;
+
+		for (sample_index = 0; sample_index < samples; sample_index++) {
+			sample = psample[sample_index];
+
+			if (sample >= triggerMax) {
+				// max level reached
+				triggerEnd = sample_index;
+
+				if (triggerStart > 0 && triggerEnd > triggerStart) {
+					// find center
+					unsigned int tmp = (triggerEnd - triggerStart) / 2 + triggerStart;
+
+					if (triggerStart < (samples / 2) && triggerEnd <= (samples / 2)) {
+						// add potential trigger position left of center
+						triggerPos[0] = triggerPos[1];
+						triggerPos[1] = tmp;
+						triggerCnt++;
+					}
+					else if (triggerStart >= (samples / 2) && triggerEnd > (samples / 2)) {
+						// add potential trigger position right of center
+						if (triggerPos[3] == 0)
+							triggerPos[3] = tmp;
+						else if (triggerPos[4] == 0)
+							triggerPos[4] = tmp;
+
+						triggerCnt++;
+					}
+					else {
+						// add potential trigger position around center
+						triggerPos[5] = tmp;
+						triggerCnt++;
+					}
+
+					// wait for next slope
+					triggerStart = 0;
+					triggerEnd = 0;
+				}
+				else {
+					// no start found
+					triggerStart = 0;
+					triggerEnd = 0;
+				}
+			}
+			else if (sample >= triggerMin) {
+				// min level reached
+				triggerStart = sample_index;
+				triggerEnd = 0;
+			}
+			else {
+				// outside trigger window
+				triggerStart = 0;
+			}
+		}
+
+		if (triggerCnt > 0) {
+			// default to center
+			triggerStart = (samples / 2);
+
+			if (triggerPos[2] > 0) {
+				// use center trigger position
+				triggerStart = triggerPos[3];
+			}
+			else {
+				triggerEnd = (samples / 2);
+
+				if (triggerPos[1] > 0 && (samples / 2) >= triggerPos[1]) {
+					triggerStart = (samples / 2) - triggerPos[1];
+				}
+				if (triggerPos[3] > 0 && triggerPos[3] >= (samples / 2)) {
+					triggerEnd = triggerPos[3] - (samples / 2);
+				}
+
+				// use the position closer to the center
+				if (triggerPos[1] > 0 && triggerStart < triggerEnd) {
+					// left of center
+					triggerStart = triggerPos[1];
+				}
+				else if (triggerPos[3] > 0 && triggerEnd < triggerStart) {
+					// right of center
+					triggerStart = triggerPos[3];
+				}
+			}
+
+			// curve duration is half of the available chuck length
+			// so draw one quarter of the total samples to the left, and one quarter to the right, if possible
+			if (triggerStart >= (samples / 4) && (triggerStart + (samples / 4) <= samples)) {
+				sample_min = triggerStart - (samples / 4);
+				sample_max = triggerStart + (samples / 4) + 1;
+			}
+			else {
+				sample_min = (samples / 4);
+				sample_max = 3 * (samples / 4) + 1;
+			}
+		}
+		else {
+			// no trigger found
+			softTrigger = false;
+		}
+	}
+
+// curve duration, determines number of samples per column
+//	duration = (audio_sample)100e-3;
+	duration = (audio_sample)(sample_max - sample_min) / (audio_sample)samplerate;
 
 	samples_per_col = (unsigned int)floor((duration * (audio_sample)samplerate) / (audio_sample)cols);
 
 	// limit samples_per_col if not enough samples available (the length of the requested audio buffer is currently equal to the timer interval!)
-	if (samples < (samples_per_col * cols))
-		samples_per_col = samples / cols;
+	if ((sample_max - sample_min) < (samples_per_col * cols))
+		samples_per_col = (sample_max - sample_min) / cols;
 
 	// clear counters
 	ClearCounterBuffer();
@@ -1358,11 +1498,8 @@ void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int sampl
 	col = 0;
 	max_cnt = 1;
 	i = 0;
-	for (sample_index = 0; sample_index < samples; sample_index++) {
+	for (sample_index = sample_min; sample_index < sample_max; sample_index++) {
 		sample = psample[sample_index];
-
-		// offset (-1.0 ... 1.0)
-		sample += offset;
 
 		// sample to row
 		sample = sample * m + n;
@@ -1433,8 +1570,18 @@ void ws2812::CalcAndOutput(void)
 
 		if (lineStyle == ws2812_oscilloscope) {
 			// length of audio data
+#if 0
+			double		length = (double)timerInterval * 1e-3;	//audioLength;
+#else
+			// read samples before and after the current track time
 			double		length = (double)timerInterval * 1e-3;	//audioLength;
 
+			if (abs_time >= length) {
+				// enough time has passed -> double the length
+				abs_time -= length;
+				length *= 2;
+			}
+#endif
 			// audio data
 			if (visStream->get_chunk_absolute(chunk, abs_time, length)) {
 				// number of channels, should be 1
@@ -2140,14 +2287,15 @@ void ws2812::SetAmplitudeMinMax(int min, int max)
 		bool changed = false;
 
 		if (this->lineStyle == ws2812_oscilloscope) {
-			if (min >= amplitude_oscilloscope_min && min <= amplitude_oscilloscope_max) {
+			// min is offset
+			if (min >= offset_oscilloscope_min && min <= offset_oscilloscope_max) {
 				changed |= (this->amplMin[this->lineStyle] != min);
 			}
 			else {
 				min = this->amplMin[this->lineStyle];
 			}
-
-			if (max >= amplitude_oscilloscope_min && max <= amplitude_oscilloscope_max) {
+			// max is gain
+			if (max >= gain_oscilloscope_min && max <= gain_oscilloscope_max) {
 				changed |= (this->amplMax[this->lineStyle] != max);
 			}
 			else {
@@ -2541,7 +2689,7 @@ void ws2812::InitAmplitudeMinMax()
 
 
 	min = (offset_oscilloscope_max - offset_oscilloscope_max) / 2;
-	max = amplitude_oscilloscope_max;
+	max = gain_oscilloscope_min;
 
 	// oscilloscope
 	GetCfgOscilloscopeOffsetAmplitude(&min, &max);
@@ -2555,12 +2703,12 @@ void ws2812::InitAmplitudeMinMax()
 		min = offset_oscilloscope_max;
 		changed = true;
 	}
-	if (max < amplitude_oscilloscope_min) {
-		max = amplitude_oscilloscope_min;
+	if (max < gain_oscilloscope_min) {
+		max = gain_oscilloscope_min;
 		changed = true;
 	}
-	if (max > amplitude_oscilloscope_max) {
-		max = amplitude_oscilloscope_max;
+	if (max > gain_oscilloscope_max) {
+		max = gain_oscilloscope_max;
 		changed = true;
 	}
 	if (min > max) {
