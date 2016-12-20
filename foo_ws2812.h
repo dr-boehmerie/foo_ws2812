@@ -18,6 +18,9 @@ enum line_style
 
 	ws2812_oscilloscope,				// oscilloscope, single colored
 
+	ws2812_oscillogram_horizontal,		// oscillogram, moving horizontally
+	ws2812_oscillogram_vertical,		// oscillogram, moving vertically
+
 	ws2812_line_style_no
 };
 
@@ -113,22 +116,26 @@ private:
 	unsigned int LedIndex(unsigned int row, unsigned int col);
 	enum led_mode GetLedMode(unsigned int startLed, unsigned int ledDir);
 	void CalcColorSimple(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
-	void CalcColor(audio_sample sample, audio_sample min, unsigned int &r, unsigned int &g, unsigned int &b);
 	void CalcRowColor(audio_sample row, unsigned int &r, unsigned int &g, unsigned int &b);
 	void CalcColorColoredRows(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
 	void CalcColorColoredBars(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
-	void CalcColor(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b);
+	void GetColor(unsigned int index, unsigned int &r, unsigned int &g, unsigned int &b);
 	void CalcPersistenceMax(unsigned int &c, unsigned int &p_c);
 	void CalcPersistenceAdd(unsigned int &c, unsigned int &p_c);
 	void AddPersistenceSpectrum(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
 	void AddPersistenceOscilloscope(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
 	void ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned int &g, unsigned int &b);
-	void ColorsToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
+	void ColorsToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int r, unsigned int g, unsigned int b);
+	void OutputScrollLeft(unsigned char *buffer);
+	void OutputScrollRight(unsigned char *buffer);
+	void OutputScrollUp(unsigned char *buffer);
+	void OutputScrollDown(unsigned char *buffer);
 
 	void OutputTest(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer, unsigned int bufferSize);
 	void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer);
 	void OutputSpectrogram(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer);
 	void OutputOscilloscope(const audio_sample *psample, unsigned int samples, unsigned int samplerate, audio_sample peak, unsigned char *buffer);
+	void OutputOscillogram(const audio_sample *psample, unsigned int samples, unsigned int samplerate, audio_sample peak, unsigned char *buffer);
 
 public:
 	static const unsigned int	rows_min = 1;
@@ -208,6 +215,9 @@ private:
 	const unsigned int	colorNo = 1000;
 	unsigned int		*colorTab;
 
+	audio_sample		colorsPerRow;
+	audio_sample		colorsPerCol;
+
 	int					freqMin[ws2812_line_style_no];
 	int					freqMax[ws2812_line_style_no];
 
@@ -246,6 +256,8 @@ bool GetScaling(int *logFrequency, int *logAmplitude, int *peakValues);
 bool GetInterval(unsigned int *interval);
 bool GetBrightness(unsigned int *brightness);
 bool GetLineStyle(unsigned int *lineStyle);
+bool GetMinAmplitudeIsOffset(void);
+bool GetMaxAmplitudeIsGain(void);
 
 bool GetAmplitudeMinMax(int *min, int *max);
 bool GetFrequencyMinMax(int *min, int *max);

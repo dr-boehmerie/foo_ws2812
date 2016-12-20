@@ -118,7 +118,7 @@ LPCTSTR		cfg_ledDirStr[ws2812_led_dir_no] = { L"Common", L"Alternating" };
 LRESULT		cfg_ledDirId[ws2812_led_dir_no];
 
 // TODO number of entries should depend on enum line_style
-LPCTSTR		cfg_lineStyleStr[ws2812_line_style_no] = { L"Simple", L"Bars", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe" };
+LPCTSTR		cfg_lineStyleStr[ws2812_line_style_no] = { L"Simple", L"Bars", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe", L"Oscillogram (hori)", L"Oscillogram (vert)" };
 LRESULT		cfg_lineStyleId[ws2812_line_style_no];
 
 
@@ -429,6 +429,8 @@ void CWS2812Preferences::apply() {
 	case ws2812_spectrogram_horizontal:		colors = GetCfgSpectrogramColors();		break;
 	case ws2812_spectrogram_vertical:		colors = GetCfgSpectrogramColors();		break;
 	case ws2812_oscilloscope:				colors = GetCfgOscilloscopeColors();	break;
+	case ws2812_oscillogram_horizontal:		colors = GetCfgOscilloscopeColors();	break;
+	case ws2812_oscillogram_vertical:		colors = GetCfgOscilloscopeColors();	break;
 	}
 	InitColorTab(colors);
 

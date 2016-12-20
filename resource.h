@@ -58,8 +58,9 @@
 #define IDC_STYLE_4                     1043
 #define IDC_STYLE_5                     1044
 #define IDC_TXT_SPECTROGRAM_COLORS      1044
-#define IDC_TXT_SPECTRUM_BAR_COLORS4    1045
 #define IDC_TXT_OSCILLOSCOPE_COLORS     1045
+#define IDC_STYLE_6                     1045
+#define IDC_STYLE_7                     1046
 
 // Next default values for new objects
 // 

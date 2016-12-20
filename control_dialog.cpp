@@ -33,6 +33,8 @@ public:
 		COMMAND_HANDLER_EX(IDC_STYLE_3, BN_CLICKED, OnStyleClicked)
 		COMMAND_HANDLER_EX(IDC_STYLE_4, BN_CLICKED, OnStyleClicked)
 		COMMAND_HANDLER_EX(IDC_STYLE_5, BN_CLICKED, OnStyleClicked)
+		COMMAND_HANDLER_EX(IDC_STYLE_6, BN_CLICKED, OnStyleClicked)
+		COMMAND_HANDLER_EX(IDC_STYLE_7, BN_CLICKED, OnStyleClicked)
 		MSG_WM_CONTEXTMENU(OnContextMenu)
 	END_MSG_MAP()
 private:
@@ -243,15 +245,13 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 	}
 	else if (hwnd == m_slider_ampl_min) {
 		int val = m_slider_ampl_min.GetPos();
-		unsigned int style;
 
-		_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, val);
-
-		if (GetLineStyle(&style)) {
-			if (style == ws2812_oscilloscope) {
-				// this value is used as offset
-				_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)val / 100.0);
-			}
+		if (GetMinAmplitudeIsOffset()) {
+			// this value is used as offset
+			_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)val / 100.0);
+		}
+		else {
+			_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, val);
 		}
 
 		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
@@ -263,15 +263,13 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 	}
 	else if (hwnd == m_slider_ampl_max) {
 		int val = m_slider_ampl_max.GetPos();
-		unsigned int style;
 
-		_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, val);
-
-		if (GetLineStyle(&style)) {
-			if (style == ws2812_oscilloscope) {
-				// this value is used as gain
-				_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)val / 10.0);
-			}
+		if (GetMaxAmplitudeIsGain()) {
+			// this value is used as gain
+			_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)val / 10.0);
+		}
+		else {
+			_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, val);
 		}
 
 		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
@@ -340,7 +338,7 @@ void CWS2812ControlDialog::UpdateFrequencyAmplitudeSlider(void)
 
 	GetAmplitudeMinMax(&amin, &amax);
 
-	if (style == ws2812_oscilloscope) {
+	if (GetMinAmplitudeIsOffset()) {
 		// Oscilloscope: offset: -100 ... 100 -> -1.0 ... 1.0
 		m_slider_ampl_min.SetRange(ws2812::offset_oscilloscope_min, ws2812::offset_oscilloscope_max, TRUE);
 		m_slider_ampl_min.SetTicFreq((ws2812::offset_oscilloscope_max - ws2812::offset_oscilloscope_min) / 10);
@@ -348,7 +346,17 @@ void CWS2812ControlDialog::UpdateFrequencyAmplitudeSlider(void)
 
 		_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)amin / 100.0);
 		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
+	}
+	else {
+		m_slider_ampl_min.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
+		m_slider_ampl_min.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
+		m_slider_ampl_min.SetPos(amin);
 
+		_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, amin);
+		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
+	}
+
+	if (GetMaxAmplitudeIsGain()) {
 		// gain: 10 ... 100 -> 1.0 ... 10.0
 		m_slider_ampl_max.SetRange(ws2812::gain_oscilloscope_min, ws2812::gain_oscilloscope_max, TRUE);
 		m_slider_ampl_max.SetTicFreq((ws2812::gain_oscilloscope_max - ws2812::gain_oscilloscope_min) / 10);
@@ -362,13 +370,6 @@ void CWS2812ControlDialog::UpdateFrequencyAmplitudeSlider(void)
 		m_slider_freq_max.EnableWindow(false);
 	}
 	else {
-		m_slider_ampl_min.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
-		m_slider_ampl_min.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
-		m_slider_ampl_min.SetPos(amin);
-
-		_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, amin);
-		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
-
 		m_slider_ampl_max.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
 		m_slider_ampl_max.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
 		m_slider_ampl_max.SetPos(amax);
@@ -397,34 +398,41 @@ void CWS2812ControlDialog::OnStyleClicked(UINT code, int id, CWindow hwnd)
 	case IDC_STYLE_3:	style = 3;		break;
 	case IDC_STYLE_4:	style = 4;		break;
 	case IDC_STYLE_5:	style = 5;		break;
+	case IDC_STYLE_6:	style = 6;		break;
+	case IDC_STYLE_7:	style = 7;		break;
 	default:
 		r = false;
 		break;
 	}
 
 	if (r) {
+		// save selected line style
 		SetLineStyle(style);
 
-		switch (style)
-		{
-		case ws2812_spectrum_simple:			colors = GetCfgSpectrumColors();		break;
-		case ws2812_spectrum_green_red_bars:	colors = GetCfgSpectrumBarColors();		break;
-		case ws2812_spectrum_fire_lines:		colors = GetCfgSpectrumFireColors();	break;
-		case ws2812_spectrogram_horizontal:		colors = GetCfgSpectrogramColors();		break;
-		case ws2812_spectrogram_vertical:		colors = GetCfgSpectrogramColors();		break;
-		case ws2812_oscilloscope:				colors = GetCfgOscilloscopeColors();	break;
-		}
+		if (GetLineStyle(&style)) {
+			// init color tab
+			switch (style)
+			{
+			case ws2812_spectrum_simple:			colors = GetCfgSpectrumColors();		break;
+			case ws2812_spectrum_green_red_bars:	colors = GetCfgSpectrumBarColors();		break;
+			case ws2812_spectrum_fire_lines:		colors = GetCfgSpectrumFireColors();	break;
+			case ws2812_spectrogram_horizontal:		colors = GetCfgSpectrogramColors();		break;
+			case ws2812_spectrogram_vertical:		colors = GetCfgSpectrogramColors();		break;
+			case ws2812_oscilloscope:				colors = GetCfgOscilloscopeColors();	break;
+			case ws2812_oscillogram_horizontal:		colors = GetCfgOscilloscopeColors();	break;
+			case ws2812_oscillogram_vertical:		colors = GetCfgOscilloscopeColors();	break;
+			}
 
-		if (colors != NULL)
-			InitColorTab(colors);
+			if (colors != NULL)
+				InitColorTab(colors);
+
+			SetCfgLineStyle(style);
+		}
 	}
 
 	// frequency and amplitude scaling changes
 	UpdateFrequencyAmplitudeSlider();
 
-	// save selected line style
-	if (GetLineStyle(&style))
-		SetCfgLineStyle(style);
 }
 
 void CWS2812ControlDialog::EnableButton(int id, bool enable)
@@ -520,6 +528,8 @@ BOOL CWS2812ControlDialog::OnInitDialog(CWindow, LPARAM) {
 	case 3:		r = SendDlgItemMessage(IDC_STYLE_3, BM_SETCHECK, BST_CHECKED, 0);		break;
 	case 4:		r = SendDlgItemMessage(IDC_STYLE_4, BM_SETCHECK, BST_CHECKED, 0);		break;
 	case 5:		r = SendDlgItemMessage(IDC_STYLE_5, BM_SETCHECK, BST_CHECKED, 0);		break;
+	case 6:		r = SendDlgItemMessage(IDC_STYLE_6, BM_SETCHECK, BST_CHECKED, 0);		break;
+	case 7:		r = SendDlgItemMessage(IDC_STYLE_7, BM_SETCHECK, BST_CHECKED, 0);		break;
 	default:
 		break;
 	}
