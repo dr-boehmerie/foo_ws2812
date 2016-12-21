@@ -203,6 +203,7 @@ private:
 	void OnCBChange(UINT, int, CWindow);
 	bool HasChanged();
 	void OnChanged();
+	void UpdateMatrixInfo();
 
 	const preferences_page_callback::ptr m_callback;
 
@@ -274,6 +275,9 @@ BOOL CWS2812Preferences::OnInitDialog(CWindow, LPARAM) {
 	pattern = cfg_oscilloscopeColors;
 	uSetDlgItemText(*this, IDC_TXT_OSCILLOSCOPE_COLORS, pattern);
 
+	// update matrix info
+	UpdateMatrixInfo();
+
 	cbChanged = false;
 
 	return FALSE;
@@ -316,6 +320,9 @@ void CWS2812Preferences::reset() {
 	uSetDlgItemText(*this, IDC_TXT_SPECTROGRAM_COLORS, default_cfg_spectrogramColors);
 	uSetDlgItemText(*this, IDC_TXT_OSCILLOSCOPE_COLORS, default_cfg_oscilloscopeColors);
 
+	// update matrix info
+	UpdateMatrixInfo();
+
 	cbChanged = true;
 
 	OnChanged();
@@ -329,18 +336,30 @@ void CWS2812Preferences::apply() {
 
 	// Min/Max ???
 	val = GetDlgItemInt(IDC_MATRIX_ROWS, NULL, FALSE);
+	val = GetRowLimited(val);
+	SetDlgItemInt(IDC_MATRIX_ROWS, val, FALSE);
+
 	changed |= (cfg_matrixRows != val);
 	cfg_matrixRows = val;
 
 	val = GetDlgItemInt(IDC_MATRIX_COLS, NULL, FALSE);
+	val = GetColumnsLimited(val);
+	SetDlgItemInt(IDC_MATRIX_COLS, val, FALSE);
+
 	changed |= (cfg_matrixCols != val);
 	cfg_matrixCols = val;
 
 	val = GetDlgItemInt(IDC_BRIGHTNESS, NULL, FALSE);
+	val = GetBrightnessLimited(val);
+	SetDlgItemInt(IDC_BRIGHTNESS, val, FALSE);
+
 	changed |= (cfg_brightness != val);
 	cfg_brightness = val;
 
 	val = GetDlgItemInt(IDC_UPDATE_INTERVAL, NULL, FALSE);
+	val = GetIntervalLimited(val);
+	SetDlgItemInt(IDC_UPDATE_INTERVAL, val, FALSE);
+
 	changed |= (cfg_updateInterval != val);
 	cfg_updateInterval = val;
 
@@ -434,6 +453,9 @@ void CWS2812Preferences::apply() {
 	}
 	InitColorTab(colors);
 
+	// update the matrix info text
+	UpdateMatrixInfo();
+
 	// restart the output
 	if (isActive)
 		StartOutput();
@@ -480,9 +502,36 @@ bool CWS2812Preferences::HasChanged() {
 
 	return changed;
 }
+
 void CWS2812Preferences::OnChanged() {
+	// update the matrix info text
+	UpdateMatrixInfo();
 	//tell the host that our state has changed to enable/disable the apply button appropriately.
 	m_callback->on_state_changed();
+}
+
+void CWS2812Preferences::UpdateMatrixInfo(void)
+{
+	UINT	rows, cols, total, brightness;
+	double	time, current;
+	WCHAR	text[100];
+
+	// get matrix configuration
+	rows = GetDlgItemInt(IDC_MATRIX_ROWS, NULL, FALSE);
+	cols = GetDlgItemInt(IDC_MATRIX_COLS, NULL, FALSE);
+	brightness = GetDlgItemInt(IDC_BRIGHTNESS, NULL, FALSE);
+
+	// count of LEDs
+	total = rows * cols;
+
+	// led transfer time: reset plus 1.25us per led
+	time = 50 + ceil((double)total * 1.25);
+
+	// maximum power consumption (max 60mA per LED)
+	current = 0.06 * (double)total * ((double)ws2812::brightness_max / 100);
+
+	_stprintf_s(text, L"%u LEDs: %.2f A; %.0f us", total, current, time);
+	SetDlgItemText(IDC_MATRIX_INFO, text);
 }
 
 class preferences_page_ws2812 : public preferences_page_impl<CWS2812Preferences> {

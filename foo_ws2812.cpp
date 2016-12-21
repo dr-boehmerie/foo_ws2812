@@ -170,6 +170,11 @@ bool ws2812::StopTimer()
 	if (hTimer != INVALID_HANDLE_VALUE) {
 		DeleteTimerQueueTimer(NULL, hTimer, NULL);
 		hTimer = INVALID_HANDLE_VALUE;
+
+		// wait if the timer is currently active
+		while (timerActive) {
+
+		}
 		return true;
 	}
 	return false;
@@ -249,10 +254,13 @@ enum led_mode ws2812::GetLedMode(unsigned int startLed, unsigned int ledDir)
 
 void ws2812::InitIndexLut(void)
 {
+	unsigned int	rows = this->rows;
+	unsigned int	cols = this->columns;
 	unsigned int	row, col;
 	unsigned int	idx;
 
-	if (indexLut == nullptr)
+	assert(indexLut != nullptr);
+	if (indexLut == nullptr || rows <= 0 || cols <= 0)
 		return;
 
 	switch (ledMode)
@@ -260,7 +268,7 @@ void ws2812::InitIndexLut(void)
 	default:
 	case ws2812_led_mode_top_left_common:			// Top Left, Common direction left to right
 		// 1:1
-		for (idx = 0; idx < (rows * columns); idx++) {
+		for (idx = 0; idx < (rows * cols); idx++) {
 			indexLut[idx] = idx;
 		}
 		break;
@@ -268,8 +276,8 @@ void ws2812::InitIndexLut(void)
 	case ws2812_led_mode_top_right_common:			// Top Right, Common direction right to left
 		idx = 0;
 		for (row = 0; row < rows; row++) {
-			for (col = 0; col < columns; col++) {
-				indexLut[idx] = row * columns + (columns - 1 - col);
+			for (col = 0; col < cols; col++) {
+				indexLut[idx] = row * cols + (cols - 1 - col);
 				idx++;
 			}
 		}
@@ -278,8 +286,8 @@ void ws2812::InitIndexLut(void)
 	case ws2812_led_mode_bottom_left_common:		// Bottom Left, Common direction left to right
 		idx = 0;
 		for (row = 0; row < rows; row++) {
-			for (col = 0; col < columns; col++) {
-				indexLut[idx] = (rows - 1 - row) * columns + col;
+			for (col = 0; col < cols; col++) {
+				indexLut[idx] = (rows - 1 - row) * cols + col;
 				idx++;
 			}
 		}
@@ -288,8 +296,8 @@ void ws2812::InitIndexLut(void)
 	case ws2812_led_mode_bottom_right_common:		// Bottom Right, Common direction right to left
 		idx = 0;
 		for (row = 0; row < rows; row++) {
-			for (col = 0; col < columns; col++) {
-				indexLut[idx] = (rows - 1 - row) * columns + (columns - 1 - col);
+			for (col = 0; col < cols; col++) {
+				indexLut[idx] = (rows - 1 - row) * cols + (cols - 1 - col);
 				idx++;
 			}
 		}
@@ -298,14 +306,14 @@ void ws2812::InitIndexLut(void)
 	case ws2812_led_mode_top_left_alternating:		// Top Left, Alternating direction left to right/right to left
 		idx = 0;
 		for (row = 0; row < rows; row++) {
-			for (col = 0; col < columns; col++) {
+			for (col = 0; col < cols; col++) {
 				if ((row & 1) == 0) {
 					// even row: left to right
-					indexLut[idx] = row * columns + col;
+					indexLut[idx] = row * cols + col;
 				}
 				else {
 					// odd row: right to left
-					indexLut[idx] = row * columns + (columns - 1 - col);
+					indexLut[idx] = row * cols + (cols - 1 - col);
 				}
 				idx++;
 			}
@@ -315,14 +323,14 @@ void ws2812::InitIndexLut(void)
 	case ws2812_led_mode_top_right_alternating:		// Top Right, Alternating direction right to left/left to right
 		idx = 0;
 		for (row = 0; row < rows; row++) {
-			for (col = 0; col < columns; col++) {
+			for (col = 0; col < cols; col++) {
 				if ((row & 1) != 0) {
 					// odd row: left to right
-					indexLut[idx] = row * columns + col;
+					indexLut[idx] = row * cols + col;
 				}
 				else {
 					// even row: right to left
-					indexLut[idx] = row * columns + (columns - 1 - col);
+					indexLut[idx] = row * cols + (cols - 1 - col);
 				}
 				idx++;
 			}
@@ -332,14 +340,14 @@ void ws2812::InitIndexLut(void)
 	case ws2812_led_mode_bottom_left_alternating:	// Bottom Left, Alternating direction left to right/right to left
 		idx = 0;
 		for (row = 0; row < rows; row++) {
-			for (col = 0; col < columns; col++) {
+			for (col = 0; col < cols; col++) {
 				if ((row & 1) == (rows & 1)) {
 					// last row, second next to last and so on: left to right
-					indexLut[idx] = (rows - 1 - row) * columns + col;
+					indexLut[idx] = (rows - 1 - row) * cols + col;
 				}
 				else {
 					// other row: right to left
-					indexLut[idx] = (rows - 1 - row) * columns + (columns - 1 - col);
+					indexLut[idx] = (rows - 1 - row) * cols + (cols - 1 - col);
 				}
 				idx++;
 			}
@@ -349,14 +357,14 @@ void ws2812::InitIndexLut(void)
 	case ws2812_led_mode_bottom_right_alternating:	// Bottom Right, Alternating right to left/direction left to right
 		idx = 0;
 		for (row = 0; row < rows; row++) {
-			for (col = 0; col < columns; col++) {
+			for (col = 0; col < cols; col++) {
 				if ((row & 1) == (rows & 1)) {
 					// last row, second next to last and so on: right to left
-					indexLut[idx] = (rows - 1 - row) * columns + (columns - 1 - col);
+					indexLut[idx] = (rows - 1 - row) * cols + (cols - 1 - col);
 				}
 				else {
 					// other row: left to right
-					indexLut[idx] = (rows - 1 - row) * columns + col;
+					indexLut[idx] = (rows - 1 - row) * cols + col;
 				}
 				idx++;
 			}
@@ -368,10 +376,9 @@ void ws2812::InitIndexLut(void)
 unsigned int ws2812::LedIndex(unsigned int row, unsigned int col)
 {
 	// use prebuilt lut
-	if (indexLut == nullptr)
-		return 0;
-	else
-		return indexLut[row * columns + col];
+	assert(indexLut != nullptr);
+
+	return indexLut[row * columns + col];
 }
 
 void ws2812::CalcColorSimple(unsigned int row, audio_sample sample, unsigned int &r, unsigned int &g, unsigned int &b)
@@ -492,14 +499,11 @@ void ws2812::CalcColorColoredBars(unsigned int row, audio_sample sample, unsigne
 
 void ws2812::GetColor(unsigned int index, unsigned int &r, unsigned int &g, unsigned int &b)
 {
-	if (colorTab != nullptr) {
-		r = GET_COLOR_R(colorTab[index]);
-		g = GET_COLOR_G(colorTab[index]);
-		b = GET_COLOR_B(colorTab[index]);
-	}
-	else {
-		r = g = b = 0;
-	}
+	assert(colorTab != nullptr);
+
+	r = GET_COLOR_R(colorTab[index]);
+	g = GET_COLOR_G(colorTab[index]);
+	b = GET_COLOR_B(colorTab[index]);
 }
 
 void ws2812::CalcPersistenceMax(unsigned int &c, unsigned int &p_c)
@@ -531,39 +535,34 @@ void ws2812::AddPersistenceSpectrum(unsigned int led_index, unsigned int &r, uns
 {
 	unsigned int	p_r, p_g, p_b;
 
-	if (persistenceBuffer != nullptr) {
-		// RGB
-		p_r = persistenceBuffer[3 * led_index + 0];
-		p_g = persistenceBuffer[3 * led_index + 1];
-		p_b = persistenceBuffer[3 * led_index + 2];
+	assert(persistenceBuffer != nullptr);
 
-		CalcPersistenceMax(r, p_r);
-		CalcPersistenceMax(g, p_g);
-		CalcPersistenceMax(b, p_b);
+	p_r = GET_COLOR_R(persistenceBuffer[led_index]);
+	p_g = GET_COLOR_G(persistenceBuffer[led_index]);
+	p_b = GET_COLOR_B(persistenceBuffer[led_index]);
 
-		persistenceBuffer[3 * led_index + 0] = p_r;
-		persistenceBuffer[3 * led_index + 1] = p_g;
-		persistenceBuffer[3 * led_index + 2] = p_b;
-	}
+	CalcPersistenceMax(r, p_r);
+	CalcPersistenceMax(g, p_g);
+	CalcPersistenceMax(b, p_b);
+
+	persistenceBuffer[led_index] = MAKE_COLOR(p_r, p_g, p_b);
 }
 
 void ws2812::AddPersistenceOscilloscope(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b)
 {
 	unsigned int	p_r, p_g, p_b;
 
-	if (persistenceBuffer != nullptr) {
-		p_r = persistenceBuffer[3 * led_index + 0];
-		p_g = persistenceBuffer[3 * led_index + 1];
-		p_b = persistenceBuffer[3 * led_index + 2];
+	assert(persistenceBuffer != nullptr);
 
-		CalcPersistenceAdd(r, p_r);
-		CalcPersistenceAdd(g, p_g);
-		CalcPersistenceAdd(b, p_b);
+	p_r = GET_COLOR_R(persistenceBuffer[led_index]);
+	p_g = GET_COLOR_G(persistenceBuffer[led_index]);
+	p_b = GET_COLOR_B(persistenceBuffer[led_index]);
 
-		persistenceBuffer[3 * led_index + 0] = p_r;
-		persistenceBuffer[3 * led_index + 1] = p_g;
-		persistenceBuffer[3 * led_index + 2] = p_b;
-	}
+	CalcPersistenceAdd(r, p_r);
+	CalcPersistenceAdd(g, p_g);
+	CalcPersistenceAdd(b, p_b);
+
+	persistenceBuffer[led_index ] = MAKE_COLOR(p_r, p_g, p_b);
 }
 
 
@@ -575,21 +574,48 @@ void ws2812::ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned 
 	b = (b * brightness) / 100;
 }
 
-void ws2812::ColorsToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int r, unsigned int g, unsigned int b)
+void ws2812::ColorsToImage(unsigned int led_index, unsigned int r, unsigned int g, unsigned int b)
 {
-	// all values < 2 are replaced by 0 (1 is reserved for start of block)
-	if (r < 2)	r = 0;
-	if (g < 2)	g = 0;
-	if (b < 2)	b = 0;
+	unsigned int	color = MAKE_COLOR(r, g, b);
+
+	assert(imageBuffer != nullptr);
 
 	// write colors to buffer
-	// color ouput order is fixed to GRB
-	buffer[3 * led_index + 0] = (unsigned char)g;
-	buffer[3 * led_index + 1] = (unsigned char)r;
-	buffer[3 * led_index + 2] = (unsigned char)b;
+	imageBuffer[led_index] = color;
 }
 
-void ws2812::OutputScrollLeft(unsigned char *buffer)
+void ws2812::ImageToBuffer(unsigned char *buffer, unsigned int bufferSize)
+{
+	unsigned int	i;
+	unsigned int	r, g, b;
+	unsigned int	count;
+
+	count = bufferSize / 3;
+	if (count > ledNo)
+		count = ledNo;
+
+	if (buffer && imageBuffer) {
+		for (i = 0; i < count; i++) {
+			// get RGB
+			r = GET_COLOR_R(imageBuffer[i]);
+			g = GET_COLOR_G(imageBuffer[i]);
+			b = GET_COLOR_B(imageBuffer[i]);
+
+			// all values < 2 are replaced by 0 (1 is reserved for start of block)
+			if (r < 2)	r = 0;
+			if (g < 2)	g = 0;
+			if (b < 2)	b = 0;
+
+			// write colors to buffer
+			// color ouput order is fixed to GRB
+			buffer[3 * i + 0] = (unsigned char)g;
+			buffer[3 * i + 1] = (unsigned char)r;
+			buffer[3 * i + 2] = (unsigned char)b;
+		}
+	}
+}
+
+void ws2812::ImageScrollLeft(void)
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
@@ -605,15 +631,13 @@ void ws2812::OutputScrollLeft(unsigned char *buffer)
 				unsigned int old_index = LedIndex(row, col + 1);
 
 				// copy colors
-				buffer[3 * new_index + 0] = buffer[3 * old_index + 0];
-				buffer[3 * new_index + 1] = buffer[3 * old_index + 1];
-				buffer[3 * new_index + 2] = buffer[3 * old_index + 2];
+				imageBuffer[new_index] = imageBuffer[old_index];
 			}
 		}
 	}
 }
 
-void ws2812::OutputScrollRight(unsigned char *buffer)
+void ws2812::ImageScrollRight(void)
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
@@ -629,15 +653,13 @@ void ws2812::OutputScrollRight(unsigned char *buffer)
 				unsigned int old_index = LedIndex(row, col - 1);
 
 				// copy colors
-				buffer[3 * new_index + 0] = buffer[3 * old_index + 0];
-				buffer[3 * new_index + 1] = buffer[3 * old_index + 1];
-				buffer[3 * new_index + 2] = buffer[3 * old_index + 2];
+				imageBuffer[new_index] = imageBuffer[old_index];
 			}
 		}
 	}
 }
 
-void ws2812::OutputScrollUp(unsigned char *buffer)
+void ws2812::ImageScrollUp(void)
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
@@ -653,15 +675,13 @@ void ws2812::OutputScrollUp(unsigned char *buffer)
 				unsigned int old_index = LedIndex(row + 1, col);
 
 				// copy colors
-				buffer[3 * new_index + 0] = buffer[3 * old_index + 0];
-				buffer[3 * new_index + 1] = buffer[3 * old_index + 1];
-				buffer[3 * new_index + 2] = buffer[3 * old_index + 2];
+				imageBuffer[new_index] = imageBuffer[old_index];
 			}
 		}
 	}
 }
 
-void ws2812::OutputScrollDown(unsigned char *buffer)
+void ws2812::ImageScrollDown(void)
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
@@ -677,16 +697,14 @@ void ws2812::OutputScrollDown(unsigned char *buffer)
 				unsigned int old_index = LedIndex(row - 1, col);
 
 				// copy colors
-				buffer[3 * new_index + 0] = buffer[3 * old_index + 0];
-				buffer[3 * new_index + 1] = buffer[3 * old_index + 1];
-				buffer[3 * new_index + 2] = buffer[3 * old_index + 2];
+				imageBuffer[new_index] = imageBuffer[old_index];
 			}
 		}
 	}
 }
 
 
-void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer)
+void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f)
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
@@ -722,7 +740,7 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 
 	if (db_max <= db_min) {
 		// invalid values
-		ClearLedBuffer(buffer);
+		ClearImageBuffer();
 		return;
 	}
 
@@ -766,7 +784,7 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 
 	if (f_max <= f_min || samples <= bar_cnt) {
 		// invalid values
-		ClearLedBuffer(buffer);
+		ClearImageBuffer();
 		return;
 	}
 
@@ -943,7 +961,8 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 		case ws2812_spectrum_simple:		// simple white bars
 			for (row = 1; row <= rows; row++) {
 				// shades of white
-				CalcColorSimple(row, sample, r, g, b);
+			//	CalcColorSimple(row, sample, r, g, b);
+				CalcColorColoredRows(row, sample, r, g, b);
 
 				// invert Y axis: y = rows - row
 				led_index = LedIndex(rows - row, bar);
@@ -952,7 +971,7 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 
 				ApplyBrightness(bright, r, g, b);
 
-				ColorsToBuffer(buffer, led_index, r, g, b);
+				ColorsToImage(led_index, r, g, b);
 			}
 			break;
 
@@ -968,7 +987,7 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 
 				ApplyBrightness(bright, r, g, b);
 
-				ColorsToBuffer(buffer, led_index, r, g, b);
+				ColorsToImage(led_index, r, g, b);
 			}
 			break;
 
@@ -984,7 +1003,7 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 
 				ApplyBrightness(bright, r, g, b);
 
-				ColorsToBuffer(buffer, led_index, r, g, b);
+				ColorsToImage(led_index, r, g, b);
 			}
 			break;
 		}
@@ -993,7 +1012,7 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 
 
 
-void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer)
+void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f)
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
@@ -1035,7 +1054,7 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 
 	if (db_max <= db_min) {
 		// invalid values
-		ClearLedBuffer(buffer);
+		ClearImageBuffer();
 		return;
 	}
 
@@ -1067,7 +1086,7 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 
 	if (f_max <= f_min || samples <= bar_cnt) {
 		// invalid values
-		ClearLedBuffer(buffer);
+		ClearImageBuffer();
 		return;
 	}
 
@@ -1099,13 +1118,13 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 
 	if (lineStyle == ws2812_spectrogram_horizontal) {
 		// move current image one col to the left
-		OutputScrollLeft(buffer);
+		ImageScrollLeft();
 		// new values added in the last col (right)
 		col = cols - 1;
 	}
 	else {
 		// move current image one row up
-		OutputScrollUp(buffer);
+		ImageScrollUp();
 		// new values added in the last row (bottom)
 		row = rows - 1;
 	}
@@ -1275,13 +1294,13 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 
 		ApplyBrightness(bright, r, g, b);
 
-		ColorsToBuffer(buffer, led_index, r, g, b);
+		ColorsToImage(led_index, r, g, b);
 	}
 }
 
 
 
-void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int samples, unsigned int samplerate, audio_sample peak, unsigned char * buffer)
+void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int samples, unsigned int samplerate, audio_sample peak)
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
@@ -1533,11 +1552,11 @@ void ws2812::OutputOscilloscope(const audio_sample * psample, unsigned int sampl
 
 		ApplyBrightness(bright, r, g, b);
 
-		ColorsToBuffer(buffer, led_index, r, g, b);
+		ColorsToImage(led_index, r, g, b);
 	}
 }
 
-void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int samples, unsigned int samplerate, audio_sample peak, unsigned char * buffer)
+void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int samples, unsigned int samplerate, audio_sample peak)
 {
 	unsigned int	rows = this->rows;
 	unsigned int	cols = this->columns;
@@ -1599,7 +1618,7 @@ void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int sample
 
 	if (lineStyle == ws2812_oscillogram_horizontal) {
 		// move current image one col to the left
-		OutputScrollLeft(buffer);
+		ImageScrollLeft();
 		// new values added in the last col (right)
 		col = cols - 1;
 
@@ -1652,12 +1671,12 @@ void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int sample
 
 			ApplyBrightness(bright, r, g, b);
 
-			ColorsToBuffer(buffer, led_index, r, g, b);
+			ColorsToImage(led_index, r, g, b);
 		}
 	}
 	else {
 		// move current image one row up
-		OutputScrollUp(buffer);
+		ImageScrollUp();
 		// new values added in the last row (bottom)
 		row = rows - 1;
 
@@ -1710,7 +1729,7 @@ void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int sample
 
 			ApplyBrightness(bright, r, g, b);
 
-			ColorsToBuffer(buffer, led_index, r, g, b);
+			ColorsToImage(led_index, r, g, b);
 		}
 	}
 }
@@ -1719,6 +1738,8 @@ void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int sample
 void ws2812::CalcAndOutput(void)
 {
 	double	abs_time;
+
+	timerActive = true;
 
 	// get current track time
 	if (visStream->get_absolute_time(abs_time)) {
@@ -1754,15 +1775,17 @@ void ws2812::CalcAndOutput(void)
 					// convert samples
 					const audio_sample *psample = chunk.get_data();
 					if (outputBuffer != nullptr && psample != nullptr && samples > 0) {
+						// create image
+						OutputOscilloscope(psample, samples, sample_rate, peak);
+
+						// convert image
+						ImageToBuffer(&outputBuffer[1], bufferSize - 1);
 						// a value of 1 is used as start byte
 						// and must not occur in other bytes in the buffer
 						outputBuffer[0] = 1;
 
-						OutputOscilloscope(psample, samples, sample_rate, peak, &outputBuffer[1]);
-
 						// send buffer
 						WriteABuffer(outputBuffer, bufferSize);
-
 					}
 					else {
 						// no samples ?
@@ -1793,15 +1816,17 @@ void ws2812::CalcAndOutput(void)
 											// convert samples
 				const audio_sample *psample = chunk.get_data();
 				if (outputBuffer != nullptr && psample != nullptr && samples > 0) {
+					// create image
+					OutputOscillogram(psample, samples, sample_rate, peak);
+
+					// convert image
+					ImageToBuffer(&outputBuffer[1], bufferSize - 1);
 					// a value of 1 is used as start byte
 					// and must not occur in other bytes in the buffer
 					outputBuffer[0] = 1;
 
-					OutputOscillogram(psample, samples, sample_rate, peak, &outputBuffer[1]);
-
 					// send buffer
 					WriteABuffer(outputBuffer, bufferSize);
-
 				}
 				else {
 					// no samples ?
@@ -1832,11 +1857,14 @@ void ws2812::CalcAndOutput(void)
 					// convert samples
 					const audio_sample *psample = chunk.get_data();
 					if (outputBuffer != nullptr && psample != nullptr && samples > 0) {
+						// create image
+						OutputSpectrogram(psample, samples, peak, delta_f);
+
+						// convert image
+						ImageToBuffer(&outputBuffer[1], bufferSize - 1);
 						// a value of 1 is used as start byte
 						// and must not occur in other bytes in the buffer
 						outputBuffer[0] = 1;
-
-						OutputSpectrogram(psample, samples, peak, delta_f, &outputBuffer[1]);
 
 						// send buffer
 						WriteABuffer(outputBuffer, bufferSize);
@@ -1869,11 +1897,14 @@ void ws2812::CalcAndOutput(void)
 					// convert samples
 					const audio_sample *psample = chunk.get_data();
 					if (outputBuffer != nullptr && psample != nullptr && samples > 0) {
+						// create image
+						OutputSpectrumBars(psample, samples, peak, delta_f);
+
+						// convert image
+						ImageToBuffer(&outputBuffer[1], bufferSize - 1);
 						// a value of 1 is used as start byte
 						// and must not occur in other bytes in the buffer
 						outputBuffer[0] = 1;
-
-						OutputSpectrumBars(psample, samples, peak, delta_f, &outputBuffer[1]);
 
 						// send buffer
 						WriteABuffer(outputBuffer, bufferSize);
@@ -1892,6 +1923,8 @@ void ws2812::CalcAndOutput(void)
 	else {
 		// playback hasn't started yet...
 	}
+
+	timerActive = false;
 }
 
 bool ws2812::StopOutput(void)
@@ -2318,7 +2351,7 @@ void ws2812::SetLineStyle(enum line_style style)
 		{
 		default:
 		case ws2812_spectrum_simple:
-			ClearOutputBuffer();
+			ClearImageBuffer();
 			ClearPersistence();
 
 			// init default spectrum colors
@@ -2327,7 +2360,7 @@ void ws2812::SetLineStyle(enum line_style style)
 
 		case ws2812_spectrum_green_red_bars:
 		case ws2812_spectrum_fire_lines:
-			ClearOutputBuffer();
+			ClearImageBuffer();
 			ClearPersistence();
 
 			// init default spectrum colors
@@ -2336,7 +2369,7 @@ void ws2812::SetLineStyle(enum line_style style)
 
 		case ws2812_spectrogram_horizontal:
 		case ws2812_spectrogram_vertical:
-			ClearOutputBuffer();
+			ClearImageBuffer();
 
 			// init default spectrogram colors
 			InitColorTab(spectrogramColorTab, CALC_TAB_ELEMENTS(spectrogramColorTab));
@@ -2345,7 +2378,7 @@ void ws2812::SetLineStyle(enum line_style style)
 		case ws2812_oscilloscope:
 		case ws2812_oscillogram_horizontal:
 		case ws2812_oscillogram_vertical:
-			ClearOutputBuffer();
+			ClearImageBuffer();
 			ClearPersistence();
 
 			// init default oscilloscope colors
@@ -2412,10 +2445,6 @@ bool SetBrightness(unsigned int brightness)
 	if (ws2812_global) {
 		ws2812_global->SetBrightness(brightness);
 
-		// save value
-	//	ws2812_global->GetBrightness(&brightness);
-	//	SetCfgBrightness(brightness);
-
 		return true;
 	}
 	return false;
@@ -2423,17 +2452,9 @@ bool SetBrightness(unsigned int brightness)
 
 void ws2812::SetBrightness(unsigned int brightness)
 {
-//	bool	timerRunning;
-
 	if (brightness >= brightness_min && brightness <= brightness_max) {
 		if (this->brightness != brightness) {
-		//	timerRunning = StopTimer();
-
 			this->brightness = brightness;
-
-		//	if (timerRunning) {
-		//		StartTimer();
-		//	}
 		}
 	}
 }
@@ -2490,10 +2511,6 @@ bool SetInterval(unsigned int interval)
 	if (ws2812_global) {
 		ws2812_global->SetInterval(interval);
 
-		// save value
-	//	ws2812_global->GetInterval(&interval);
-	//	SetCfgUpdateInterval(interval);
-
 		return true;
 	}
 	return false;
@@ -2502,10 +2519,10 @@ bool SetInterval(unsigned int interval)
 void ws2812::SetInterval(unsigned int interval)
 {
 	if (interval >= timerInterval_min && interval <= timerInterval_max) {
-		if (interval != timerInterval) {
-			timerInterval = interval;
+		if (this->timerInterval != interval) {
+			this->timerInterval = interval;
 			if (hTimer != INVALID_HANDLE_VALUE) {
-				ChangeTimerQueueTimer(NULL, hTimer, timerStartDelay, timerInterval);
+				ChangeTimerQueueTimer(NULL, hTimer, this->timerStartDelay, this->timerInterval);
 			}
 		}
 	}
@@ -2798,31 +2815,36 @@ bool InitColorTab(const char *pattern)
 
 bool ws2812::AllocateBuffers()
 {
+	// count of leds
 	ledNo = rows * columns;
 
 	// start byte + GRB for each LED
 	bufferSize = 1 + 3 * ledNo;
 
 	outputBuffer		= new unsigned char[bufferSize];
-	persistenceBuffer	= new unsigned char[bufferSize];
-	counterBuffer		= new unsigned int[bufferSize];
+	imageBuffer			= new unsigned int[ledNo];
+	persistenceBuffer	= new unsigned int[ledNo];
+	counterBuffer		= new unsigned int[ledNo];
 	indexLut			= new unsigned int[ledNo];
 	colorTab			= new unsigned int[colorNo];
 
 	if (   outputBuffer
+		&& imageBuffer
 		&& persistenceBuffer
 		&& counterBuffer
 		&& indexLut
 		&& colorTab)
 	{
 		ZeroMemory(outputBuffer,		bufferSize * sizeof(unsigned char));
-		ZeroMemory(persistenceBuffer,	bufferSize * sizeof(unsigned char));
-		ZeroMemory(counterBuffer,		bufferSize * sizeof(unsigned int));
+		ZeroMemory(imageBuffer,			ledNo * sizeof(unsigned int));
+		ZeroMemory(persistenceBuffer,	ledNo * sizeof(unsigned int));
+		ZeroMemory(counterBuffer,		ledNo * sizeof(unsigned int));
 		ZeroMemory(indexLut,			ledNo * sizeof(unsigned int));
 		ZeroMemory(colorTab,			colorNo * sizeof(unsigned int));
 
 		return true;
 	}
+	FreeBuffers();
 	return false;
 }
 
@@ -2831,6 +2853,10 @@ void ws2812::FreeBuffers()
 	if (outputBuffer)
 		delete outputBuffer;
 	outputBuffer = nullptr;
+
+	if (imageBuffer)
+		delete imageBuffer;
+	imageBuffer = nullptr;
 
 	if (persistenceBuffer)
 		delete persistenceBuffer;
@@ -2849,29 +2875,28 @@ void ws2812::FreeBuffers()
 	colorTab = nullptr;
 }
 
-
-void ws2812::ClearPersistence(void)
-{
-	if (persistenceBuffer)
-		ZeroMemory(persistenceBuffer, bufferSize * sizeof(unsigned char));
-}
-
 void ws2812::ClearOutputBuffer(void)
 {
 	if (outputBuffer)
 		ZeroMemory(outputBuffer, bufferSize * sizeof(unsigned char));
 }
 
+void ws2812::ClearImageBuffer(void)
+{
+	if (imageBuffer)
+		ZeroMemory(imageBuffer, ledNo * sizeof(unsigned int));
+}
+
+void ws2812::ClearPersistence(void)
+{
+	if (persistenceBuffer)
+		ZeroMemory(persistenceBuffer, ledNo * sizeof(unsigned int));
+}
+
 void ws2812::ClearCounterBuffer(void)
 {
 	if (counterBuffer)
-		ZeroMemory(counterBuffer, bufferSize * sizeof(unsigned int));
-}
-
-void ws2812::ClearLedBuffer(unsigned char *buffer)
-{
-	if (buffer)
-		ZeroMemory(buffer, ledNo * 3 * sizeof(unsigned char));
+		ZeroMemory(counterBuffer, ledNo * sizeof(unsigned int));
 }
 
 
@@ -3083,6 +3108,45 @@ void ws2812::InitFrequencyMinMax()
 	this->freqMax[ws2812_oscillogram_vertical] = frequency_max;
 }
 
+unsigned int GetRowLimited(unsigned int rows)
+{
+	if (rows < ws2812::rows_min)
+		rows = ws2812::rows_min;
+	else if (rows > ws2812::rows_max)
+		rows = ws2812::rows_max;
+
+	return rows;
+}
+
+unsigned int GetColumnsLimited(unsigned int columns)
+{
+	if (columns < ws2812::columns_min)
+		columns = ws2812::columns_min;
+	else if (columns > ws2812::columns_max)
+		columns = ws2812::columns_max;
+
+	return columns;
+}
+
+unsigned int GetIntervalLimited(unsigned int interval)
+{
+	if (interval < ws2812::timerInterval_min)
+		interval = ws2812::timerInterval_min;
+	else if (interval > ws2812::timerInterval_max)
+		interval = ws2812::timerInterval_max;
+
+	return interval;
+}
+
+unsigned int GetBrightnessLimited(unsigned int brightness)
+{
+	if (brightness < ws2812::brightness_min)
+		brightness = ws2812::brightness_min;
+	else if (brightness > ws2812::brightness_max)
+		brightness = ws2812::brightness_max;
+
+	return brightness;
+}
 
 
 ws2812::ws2812()
@@ -3093,12 +3157,14 @@ ws2812::ws2812()
 	ledNo = 0;
 	bufferSize = 0;
 	outputBuffer = nullptr;
+	imageBuffer = nullptr;
 	persistenceBuffer = nullptr;
 	counterBuffer = nullptr;
 	indexLut = nullptr;
 	colorTab = nullptr;
 
 	timerStarted = false;
+	timerActive = false;
 	initDone = false;
 
 	// ask the global visualisation manager to create a stream for us
@@ -3186,12 +3252,14 @@ ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, unsigned
 	ledNo = 0;
 	bufferSize = 0;
 	outputBuffer = nullptr;
+	imageBuffer = nullptr;
 	persistenceBuffer = nullptr;
 	counterBuffer = nullptr;
 	indexLut = nullptr;
 	colorTab = nullptr;
 
 	timerStarted = false;
+	timerActive = false;
 	initDone = false;
 
 	// ask the global visualisation manager to create a stream for us

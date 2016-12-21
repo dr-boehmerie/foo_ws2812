@@ -110,7 +110,7 @@ private:
 	void ClearPersistence(void);
 	void ClearOutputBuffer(void);
 	void ClearCounterBuffer(void);
-	void ClearLedBuffer(unsigned char *buffer);
+	void ClearImageBuffer(void);
 
 	void InitIndexLut(void);
 	unsigned int LedIndex(unsigned int row, unsigned int col);
@@ -125,44 +125,45 @@ private:
 	void AddPersistenceSpectrum(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
 	void AddPersistenceOscilloscope(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
 	void ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned int &g, unsigned int &b);
-	void ColorsToBuffer(unsigned char *buffer, unsigned int led_index, unsigned int r, unsigned int g, unsigned int b);
-	void OutputScrollLeft(unsigned char *buffer);
-	void OutputScrollRight(unsigned char *buffer);
-	void OutputScrollUp(unsigned char *buffer);
-	void OutputScrollDown(unsigned char *buffer);
+	void ColorsToImage(unsigned int led_index, unsigned int r, unsigned int g, unsigned int b);
+	void ImageToBuffer(unsigned char * buffer, unsigned int bufferSize);
+	void ImageScrollLeft(void);
+	void ImageScrollRight(void);
+	void ImageScrollUp(void);
+	void ImageScrollDown(void);
 
 	void OutputTest(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer, unsigned int bufferSize);
-	void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer);
-	void OutputSpectrogram(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f, unsigned char *buffer);
-	void OutputOscilloscope(const audio_sample *psample, unsigned int samples, unsigned int samplerate, audio_sample peak, unsigned char *buffer);
-	void OutputOscillogram(const audio_sample *psample, unsigned int samples, unsigned int samplerate, audio_sample peak, unsigned char *buffer);
+	void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f);
+	void OutputSpectrogram(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f);
+	void OutputOscilloscope(const audio_sample *psample, unsigned int samples, unsigned int samplerate, audio_sample peak);
+	void OutputOscillogram(const audio_sample *psample, unsigned int samples, unsigned int samplerate, audio_sample peak);
 
 public:
 	static const unsigned int	rows_min = 1;
-	static const unsigned int	rows_max = 32;
+	static const unsigned int	rows_max = 240;
 	static const unsigned int	rows_def = 8;
 
 	static const unsigned int	columns_min = 1;
-	static const unsigned int	columns_max = 32;
+	static const unsigned int	columns_max = 240;
 	static const unsigned int	columns_def = 8;
 
 	static const unsigned int	port_min = 1;
 	static const unsigned int	port_max = 127;
 	static const unsigned int	port_def = 3;
 
-	static const unsigned int	brightness_min = 0;
-	static const unsigned int	brightness_max = 66;
-	static const unsigned int	brightness_def = 25;
+	static const unsigned int	brightness_min = 0;			// %
+	static const unsigned int	brightness_max = 66;		// %; limited by power supply (max. 60mA per LED)
+	static const unsigned int	brightness_def = 25;		// %
 
-	static const unsigned int	timerInterval_min = 50;
-	static const unsigned int	timerInterval_max = 500;
-	static const unsigned int	timerInterval_def = 330;
+	static const unsigned int	timerInterval_min = 50;		// ms
+	static const unsigned int	timerInterval_max = 500;	// ms
+	static const unsigned int	timerInterval_def = 330;	// ms
 
-	static const int			frequency_min = 10;
-	static const int			frequency_max = 22050;
+	static const int			frequency_min = 10;			// Hz
+	static const int			frequency_max = 22050;		// Hz
 
-	static const int			amplitude_min = -100;
-	static const int			amplitude_max = 10;
+	static const int			amplitude_min = -100;		// dB
+	static const int			amplitude_max = 10;			// dB
 
 	static const int			gain_oscilloscope_min = 10;			// => * 1.0
 	static const int			gain_oscilloscope_max = 100;		// => * 10.0
@@ -196,8 +197,9 @@ private:
 	DWORD				timerStartDelay;
 	DWORD				timerInterval;
 
-	bool				initDone;
-	bool				timerStarted;
+	volatile bool		initDone;
+	volatile bool		timerStarted;
+	volatile bool		timerActive;
 
 	HANDLE				hComm;
 	HANDLE				hTimer;
@@ -206,14 +208,15 @@ private:
 	unsigned int		comPort;
 
 	unsigned int		bufferSize;
-	unsigned char		*outputBuffer;
-	unsigned char		*persistenceBuffer;
-	unsigned int		*counterBuffer;
+	unsigned char		*outputBuffer;			// data to be sent to the arduino
+	unsigned int		*imageBuffer;			// image (xRGB)
+	unsigned int		*persistenceBuffer;		// image persistence (xRGB)
+	unsigned int		*counterBuffer;			// pixel hit count in oscilloscope styles
 
-	unsigned int		*indexLut;
+	unsigned int		*indexLut;				// led index table (depends on start led and directions)
 
 	const unsigned int	colorNo = 1000;
-	unsigned int		*colorTab;
+	unsigned int		*colorTab;				// xRGB
 
 	audio_sample		colorsPerRow;
 	audio_sample		colorsPerCol;
@@ -263,6 +266,11 @@ bool GetAmplitudeMinMax(int *min, int *max);
 bool GetFrequencyMinMax(int *min, int *max);
 
 bool InitColorTab(const char *pattern);
+
+unsigned int GetRowLimited(unsigned int rows);
+unsigned int GetColumnsLimited(unsigned int columns);
+unsigned int GetIntervalLimited(unsigned int interval);
+unsigned int GetBrightnessLimited(unsigned int brightness);
 
 
 // playback_state.cpp

@@ -18,6 +18,8 @@
 #define IDC_STOP                        1006
 #define IDC_LINE_STYLE                  1006
 #define IDC_PREV                        1007
+#define IDC_COM_PORT2                   1007
+#define IDC_MATRIX_INFO                 1007
 #define IDC_NEXT                        1008
 #define IDC_RAND                        1009
 #define IDC_CONTEXTMENU                 1010
