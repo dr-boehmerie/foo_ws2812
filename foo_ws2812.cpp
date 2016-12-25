@@ -40,7 +40,17 @@ BOOL ws2812::OpenPort(LPCWSTR gszPort, unsigned int port)
 	// get current DCB
 	if (GetCommState(hComm, &dcb)) {
 		// Update DCB rate.
-	//	dcb.BaudRate = CBR_9600;
+		switch (comBaudrate)
+		{
+		case ws2812_baudrate_9600:		dcb.BaudRate = CBR_9600;	break;
+		case ws2812_baudrate_14400:		dcb.BaudRate = CBR_14400;	break;
+		case ws2812_baudrate_19200:		dcb.BaudRate = CBR_19200;	break;
+		case ws2812_baudrate_38400:		dcb.BaudRate = CBR_38400;	break;
+		case ws2812_baudrate_56000:		dcb.BaudRate = CBR_56000;	break;
+		case ws2812_baudrate_57600:		dcb.BaudRate = CBR_57600;	break;
+		default:
+		case ws2812_baudrate_115200:	dcb.BaudRate = CBR_115200;	break;
+		}
 		// Disable flow controls
 		dcb.fOutxCtsFlow = FALSE;
 		dcb.fOutxDsrFlow = FALSE;
@@ -2488,7 +2498,7 @@ bool ws2812::SetComPort(unsigned int port)
 	bool	timerRunning;
 
 	if (port >= port_min && port <= port_max) {
-		if (port != comPort) {
+		if (comPort != port) {
 			comPort = port;
 
 			timerRunning = StopTimer();
@@ -2505,6 +2515,39 @@ bool ws2812::SetComPort(unsigned int port)
 	}
 	return result;
 }
+
+bool SetComBaudrate(unsigned int baudrate)
+{
+	if (ws2812_global) {
+		return ws2812_global->SetComPort((enum ws2812_baudrate)baudrate);
+	}
+	return false;
+}
+
+bool ws2812::SetComBaudrate(enum ws2812_baudrate baudrate)
+{
+	bool	result = false;
+	bool	timerRunning;
+
+	if (baudrate < ws2812_baudrate_no) {
+		if (comBaudrate != baudrate) {
+			comBaudrate = baudrate;
+
+			timerRunning = StopTimer();
+
+			ClosePort();
+
+			if (timerRunning) {
+				if (OpenPort(NULL, comPort)) {
+					StartTimer();
+					result = true;
+				}
+			}
+		}
+	}
+	return result;
+}
+
 
 bool SetInterval(unsigned int interval)
 {
@@ -3151,6 +3194,8 @@ unsigned int GetBrightnessLimited(unsigned int brightness)
 
 ws2812::ws2812()
 {
+	unsigned int tmp;
+
 	hComm = INVALID_HANDLE_VALUE;
 	hTimer = INVALID_HANDLE_VALUE;
 
@@ -3191,6 +3236,12 @@ ws2812::ws2812()
 		if (comPort < port_min || comPort > port_max)
 			comPort = port_def;
 
+		tmp = GetCfgComBaudrate();
+		if (tmp >= ws2812_baudrate_no)
+			comBaudrate = ws2812_baudrate_115200;
+		else
+			comBaudrate = (enum ws2812_baudrate)tmp;
+
 		timerInterval = GetCfgUpdateInterval();
 		if (timerInterval < 50 || timerInterval > 1000)
 			timerInterval = 250;
@@ -3200,9 +3251,9 @@ ws2812::ws2812()
 			brightness = 25;
 
 		if (initDone) {
-			unsigned int tmp = GetCfgLineStyle();
 			const char *colors = NULL;
 
+			tmp = GetCfgLineStyle();
 			if (tmp > ws2812_line_style_no)
 				tmp = ws2812_spectrum_simple;
 
@@ -3244,7 +3295,7 @@ ws2812::ws2812()
 	}
 }
 
-ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, unsigned int interval, enum line_style style)
+ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, enum ws2812_baudrate baudrate, unsigned int interval, enum line_style style)
 {
 	hComm = INVALID_HANDLE_VALUE;
 	hTimer = INVALID_HANDLE_VALUE;
@@ -3284,10 +3335,15 @@ ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, unsigned
 		// allocate output buffer
 		initDone = AllocateBuffers();
 
-		if (port >= 1 && port < 127)
+		if (port >= port_min && port < port_max)
 			this->comPort = port;
 		else
-			this->comPort = 1;
+			this->comPort = port_def;
+
+		if (baudrate < ws2812_baudrate_no)
+			this->comBaudrate = baudrate;
+		else
+			this->comBaudrate = ws2812_baudrate_115200;
 
 		if (interval >= timerInterval_min && interval <= timerInterval_max)
 			this->timerInterval = interval;

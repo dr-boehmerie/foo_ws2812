@@ -33,6 +33,7 @@
 #define IDC_LOG_AMPL                    1017
 #define IDC_PEAK_VALS                   1018
 #define IDC_START_LED2                  1019
+#define IDC_COM_BAUDRATE                1019
 #define IDC_STOP_OUTPUT                 1022
 #define IDC_START_OUTPUT                1023
 #define IDC_LOG_FREQUENCY               1024

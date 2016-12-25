@@ -56,17 +56,30 @@ enum led_mode
 	ws2812_led_mode_no
 };
 
+enum ws2812_baudrate
+{
+	ws2812_baudrate_9600,
+	ws2812_baudrate_14400,
+	ws2812_baudrate_19200,
+	ws2812_baudrate_38400,
+	ws2812_baudrate_56000,
+	ws2812_baudrate_57600,
+	ws2812_baudrate_115200,
+
+	ws2812_baudrate_no
+};
+
 class ws2812
 {
 public:
 	ws2812();
 	~ws2812();
 
-	ws2812(unsigned int rows, unsigned int cols, unsigned int port, unsigned int interval, enum line_style style);
+	ws2812(unsigned int rows, unsigned int cols, unsigned int port, enum ws2812_baudrate baudrate, unsigned int interval, enum line_style style);
 
 	bool ConfigMatrix(int rows, int cols, enum start_led start_led, enum led_direction led_dir);
 	bool SetComPort(unsigned int port);
-	void CalcAndOutput(void);
+	bool SetComBaudrate(enum ws2812_baudrate baudrate);
 
 	void SetBrightness(unsigned int brightness);
 	void GetBrightness(unsigned int *brightness);
@@ -93,6 +106,7 @@ public:
 	bool StopOutput(void);
 	bool ToggleOutput(void);
 	bool GetOutputState(void);
+	void CalcAndOutput(void);
 
 	bool InitColorTab(void);
 	bool InitColorTab(const unsigned int *initTab, unsigned int tabElements);
@@ -205,7 +219,8 @@ private:
 	HANDLE				hTimer;
 	DWORD				commErr;
 
-	unsigned int		comPort;
+	unsigned int			comPort;
+	enum ws2812_baudrate	comBaudrate;
 
 	unsigned int		bufferSize;
 	unsigned char		*outputBuffer;			// data to be sent to the arduino
@@ -252,6 +267,7 @@ void SaveAmplitudeMinMax();
 void SaveFrequencyMinMax();
 
 bool SetComPort(unsigned int port);
+bool SetComBaudrate(unsigned int baudrate);
 
 bool SetInterval(unsigned int interval);
 
@@ -281,6 +297,7 @@ void RunWS2812ControlDialog();
 
 // preferences.cpp
 unsigned int GetCfgComPort();
+unsigned int GetCfgComBaudrate();
 unsigned int GetCfgMatrixRows();
 unsigned int GetCfgMatrixCols();
 unsigned int GetCfgBrightness();
@@ -304,6 +321,7 @@ void GetCfgSpectrumFrequencyMinMax(int *min, int *max);
 void GetCfgSpectrogramFrequencyMinMax(int *min, int *max);
 
 bool SetCfgComPort(unsigned int value);
+bool SetCfgComBaudrate(unsigned int value);
 bool SetCfgMatrixRows(unsigned int value);
 bool SetCfgMatrixCols(unsigned int value);
 bool SetCfgBrightness(unsigned int value);

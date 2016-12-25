@@ -18,6 +18,8 @@ static const GUID guid_cfg_brightness = { 0x577daa96, 0xee1f, 0x4c2a,{ 0x8e, 0xb
 static const GUID guid_cfg_updateInterval = { 0xaf4a9553, 0x2af3, 0x4735,{ 0xae, 0x1d, 0x6, 0x83, 0xf9, 0xc9, 0x4d, 0xf6 } };
 // {142E4943-994C-4F2E-B992-81597C77AFD9}
 static const GUID guid_cfg_comPort = { 0x142e4943, 0x994c, 0x4f2e,{ 0xb9, 0x92, 0x81, 0x59, 0x7c, 0x77, 0xaf, 0xd9 } };
+// {01B573BD-9C6F-4211-85F8-82D999CE5A80}
+static const GUID guid_cfg_comBaudrate = { 0x1b573bd, 0x9c6f, 0x4211,{ 0x85, 0xf8, 0x82, 0xd9, 0x99, 0xce, 0x5a, 0x80 } };
 // {556A3C73-B652-4FAB-BCB2-1340AAE742F6}
 static const GUID guid_cfg_startLed = { 0x556a3c73, 0xb652, 0x4fab,{ 0xbc, 0xb2, 0x13, 0x40, 0xaa, 0xe7, 0x42, 0xf6 } };
 // {D4F9F718-E38B-4847-93F0-C6BC6008987C}
@@ -71,15 +73,16 @@ static const GUID guid_cfg_bogoSetting3 = { 0xb462cbe2, 0x7561, 0x4ac9,{ 0xb8, 0
 
 
 enum {
-	default_cfg_matrixRows = 8,
-	default_cfg_matrixCols = 30,
-	default_cfg_brightness = 25,
-	default_cfg_updateInterval = 50,
-	default_cfg_comPort = 5,
+	default_cfg_matrixRows = ws2812::rows_def,
+	default_cfg_matrixCols = ws2812::columns_def,
+	default_cfg_brightness = ws2812::brightness_def,
+	default_cfg_updateInterval = ws2812::timerInterval_def,
+	default_cfg_comPort = ws2812::port_def,
+	default_cfg_comBaudrate = ws2812_baudrate_115200,
 	default_cfg_startLed = 0,
 	default_cfg_ledDirection = 0,
 
-	default_cfg_lineStyle = 0,
+	default_cfg_lineStyle = ws2812_spectrum_simple,
 	default_cfg_logFrequency = 1,
 	default_cfg_logAmplitude = 1,
 	default_cfg_peakValues = 1,
@@ -121,12 +124,16 @@ LRESULT		cfg_ledDirId[ws2812_led_dir_no];
 LPCTSTR		cfg_lineStyleStr[ws2812_line_style_no] = { L"Simple", L"Bars", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe", L"Oscillogram (hori)", L"Oscillogram (vert)" };
 LRESULT		cfg_lineStyleId[ws2812_line_style_no];
 
+// TODO number of entries should depend on enum line_style
+LPCTSTR		cfg_baudrateStr[ws2812_baudrate_no] = { L"9600", L"14400", L"19200", L"38400", L"56000", L"57600", L"115200" };
+LRESULT		cfg_baudrateId[ws2812_baudrate_no];
 
 static cfg_uint cfg_matrixRows(guid_cfg_matrixRows, default_cfg_matrixRows);
 static cfg_uint cfg_matrixCols(guid_cfg_matrixCols, default_cfg_matrixCols);
 static cfg_uint cfg_brightness(guid_cfg_brightness, default_cfg_brightness);
 static cfg_uint cfg_updateInterval(guid_cfg_updateInterval, default_cfg_updateInterval);
 static cfg_uint cfg_comPort(guid_cfg_comPort, default_cfg_comPort);
+static cfg_uint cfg_comBaudrate(guid_cfg_comBaudrate, default_cfg_comBaudrate);
 static cfg_uint cfg_startLed(guid_cfg_startLed, default_cfg_startLed);
 static cfg_uint cfg_ledDirection(guid_cfg_ledDirection, default_cfg_ledDirection);
 
@@ -188,6 +195,7 @@ public:
 		COMMAND_HANDLER_EX(IDC_START_LED, CBN_SELCHANGE, OnCBChange)
 		COMMAND_HANDLER_EX(IDC_LED_DIR, CBN_SELCHANGE, OnCBChange)
 		COMMAND_HANDLER_EX(IDC_LINE_STYLE, CBN_SELCHANGE, OnCBChange)
+		COMMAND_HANDLER_EX(IDC_COM_BAUDRATE, CBN_SELCHANGE, OnCBChange)
 		COMMAND_HANDLER_EX(IDC_LOG_FREQ, BN_CLICKED, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_LOG_AMPL, BN_CLICKED, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_PEAK_VALS, BN_CLICKED, OnEditChange)
@@ -257,6 +265,18 @@ BOOL CWS2812Preferences::OnInitDialog(CWindow, LPARAM) {
 	}
 	SendDlgItemMessage(IDC_LINE_STYLE, CB_SETCURSEL, cfg_lineStyleId[cfg_lineStyle], 0);
 
+	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_baudrateId); n++) {
+		WCHAR	str[64];
+
+		if (cfg_baudrateStr[n])
+			StrCpy(str, cfg_baudrateStr[n]);
+		else
+			StrCpy(str, L"?");
+		cfg_baudrateId[n] = SendDlgItemMessage(IDC_COM_BAUDRATE, CB_ADDSTRING, 0, (DWORD)str);
+	}
+	SendDlgItemMessage(IDC_COM_BAUDRATE, CB_SETCURSEL, cfg_baudrateId[cfg_comBaudrate], 0);
+
+
 	// Colors
 	pfc::string8 pattern;
 
@@ -311,8 +331,9 @@ void CWS2812Preferences::reset() {
 	CheckDlgButton(IDC_PEAK_VALS, default_cfg_peakValues);
 
 	SendDlgItemMessage(IDC_START_LED, CB_SETCURSEL, cfg_startLedId[default_cfg_startLed], 0);
-	SendDlgItemMessage(IDC_LED_DIR, CB_SETCURSEL, cfg_startLedId[default_cfg_ledDirection], 0);
-	SendDlgItemMessage(IDC_LINE_STYLE, CB_SETCURSEL, cfg_startLedId[default_cfg_lineStyle], 0);
+	SendDlgItemMessage(IDC_LED_DIR, CB_SETCURSEL, cfg_ledDirId[default_cfg_ledDirection], 0);
+	SendDlgItemMessage(IDC_LINE_STYLE, CB_SETCURSEL, cfg_lineStyleId[default_cfg_lineStyle], 0);
+	SendDlgItemMessage(IDC_COM_BAUDRATE, CB_SETCURSEL, cfg_baudrateId[default_cfg_comBaudrate], 0);
 
 	uSetDlgItemText(*this, IDC_TXT_SPECTRUM_COLORS, default_cfg_spectrumColors);
 	uSetDlgItemText(*this, IDC_TXT_SPECTRUM_BAR_COLORS, default_cfg_spectrumBarColors);
@@ -405,6 +426,15 @@ void CWS2812Preferences::apply() {
 		}
 	}
 
+	r = SendDlgItemMessage(IDC_COM_BAUDRATE, CB_GETCURSEL, 0, 0);
+	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_baudrateId); n++) {
+		if (r == cfg_baudrateId[n]) {
+			changed |= (cfg_comBaudrate != n);
+			cfg_comBaudrate = n;
+			break;
+		}
+	}
+
 	// strings
 	pfc::string8 pattern;
 
@@ -435,6 +465,7 @@ void CWS2812Preferences::apply() {
 	SetBrightness(cfg_brightness);
 	SetInterval(cfg_updateInterval);
 	SetComPort(cfg_comPort);
+	SetComBaudrate(cfg_comBaudrate);
 
 	SetLineStyle(cfg_lineStyle);
 	SetScaling(cfg_logFrequency, cfg_logAmplitude, cfg_peakValues);
@@ -554,6 +585,11 @@ static preferences_page_factory_t<preferences_page_ws2812> g_preferences_page_ws
 unsigned int GetCfgComPort()
 {
 	return cfg_comPort;
+}
+
+unsigned int GetCfgComBaudrate()
+{
+	return cfg_comBaudrate;
 }
 
 unsigned int GetCfgMatrixRows()
@@ -677,6 +713,17 @@ bool SetCfgComPort(unsigned int value)
 {
 	if (cfg_comPort != value) {
 		cfg_comPort = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgComBaudrate(unsigned int value)
+{
+	if (cfg_comBaudrate != value) {
+		cfg_comBaudrate = value;
 		return true;
 	}
 	else {
