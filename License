@@ -1,8 +1,8 @@
 foo_ws2812
 foobar2000 plugin to control WS2812 LEDs via an arduino board
-Copyright (c) 2016, Michael Boehme
+Copyright (c) 2016, 2017, Michael Boehme
 
-Based in part on the foo_sample plugin of the foobar2000 SDK
+Based in part on the foo_sample plugin from the foobar2000 SDK
 (www.foobar2000.org/SDK), which is covered by sdk_license.txt
 
 
@@ -11,16 +11,12 @@ modification, are permitted provided that the following conditions are
 met:
 
     (1) Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer. 
+    notice, this list of conditions and the following disclaimer.
 
     (2) Redistributions in binary form must reproduce the above copyright
     notice, this list of conditions and the following disclaimer in
     the documentation and/or other materials provided with the
-    distribution.  
-    
-    (3)The name of the author may not be used to
-    endorse or promote products derived from this software without
-    specific prior written permission.
+    distribution.
 
 THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
 IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
