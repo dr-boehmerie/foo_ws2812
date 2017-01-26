@@ -16,15 +16,4 @@ for downloads).
 The sketch has been modified to use the Arduino serial lib
 to be compatible with an Arduino Micro's Virtual COM Port.
 
-
-I have just started to get to know the SDK and its functions,
-copied a few source files from the foo_sample plugin and created
-a very simple basic test driver in foo_ws2812.cpp.
-This driver reads spectrum data chunks, converts them into
-a simple bargraph diagram and sends the pixel data to the COM
-port the arduino is connected to. This task is triggered by a
-Windows timer. LEDs are just lit in two shades of white, more
-sophisticated coloring scemes are planned of course ;-)
-
-A proper properties page to configure the matrix, COM port,
-update interval, colors and other settings is on the TODO list as well.
+The plugin is based on the foo_sample plugin found in the SDK.
