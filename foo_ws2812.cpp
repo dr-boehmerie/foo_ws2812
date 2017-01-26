@@ -39,6 +39,10 @@ BOOL ws2812::OpenPort(LPCWSTR gszPort, unsigned int port)
 
 	// get current DCB
 	if (GetCommState(hComm, &dcb)) {
+		// 8 N 1
+		dcb.ByteSize = 8;
+		dcb.Parity = NOPARITY;
+		dcb.StopBits = ONESTOPBIT;
 		// Update DCB rate.
 		switch (comBaudrate)
 		{
@@ -48,8 +52,12 @@ BOOL ws2812::OpenPort(LPCWSTR gszPort, unsigned int port)
 		case ws2812_baudrate_38400:		dcb.BaudRate = CBR_38400;	break;
 		case ws2812_baudrate_56000:		dcb.BaudRate = CBR_56000;	break;
 		case ws2812_baudrate_57600:		dcb.BaudRate = CBR_57600;	break;
-		default:
 		case ws2812_baudrate_115200:	dcb.BaudRate = CBR_115200;	break;
+		case ws2812_baudrate_128000:	dcb.BaudRate = CBR_128000;	break;
+		case ws2812_baudrate_250000:	dcb.BaudRate = 250000;		break;
+		case ws2812_baudrate_256000:	dcb.BaudRate = CBR_256000;	break;
+		case ws2812_baudrate_500000:	dcb.BaudRate = 500000;		break;
+		default:						dcb.BaudRate = CBR_115200;	break;
 		}
 		// Disable flow controls
 		dcb.fOutxCtsFlow = FALSE;

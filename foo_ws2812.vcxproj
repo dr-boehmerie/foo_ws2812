@@ -175,7 +175,6 @@
     <ClCompile Include="initquit.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="mainmenu.cpp" />
-    <ClCompile Include="playback_state.cpp" />
     <ClCompile Include="preferences.cpp" />
   </ItemGroup>
   <ItemGroup>

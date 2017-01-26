@@ -67,9 +67,6 @@ static const GUID guid_cfg_spectrogram_freq_max = { 0x3c273d16, 0xc12b, 0x4fa6,{
 // This GUID identifies our Advanced Preferences branch (replace with your own when reusing code).
 // {6FABE4A9-2C7F-4FA9-9598-7480C8324250}
 static const GUID guid_advconfig_branch = { 0x6fabe4a9, 0x2c7f, 0x4fa9,{ 0x95, 0x98, 0x74, 0x80, 0xc8, 0x32, 0x42, 0x50 } };
-// This GUID identifies our Advanced Preferences setting (replace with your own when reusing code) as well as this setting's storage within our component's configuration file.
-// {B462CBE2-7561-4AC9-B8DE-9297EE1FD7A0}
-static const GUID guid_cfg_bogoSetting3 = { 0xb462cbe2, 0x7561, 0x4ac9,{ 0xb8, 0xde, 0x92, 0x97, 0xee, 0x1f, 0xd7, 0xa0 } };
 
 
 enum {
@@ -101,8 +98,6 @@ enum {
 
 	default_cfg_spectrogram_freq_min = 0,
 	default_cfg_spectrogram_freq_max = 22050,
-
-	default_cfg_bogoSetting3 = 42,
 };
 
 static const char * default_cfg_spectrumColors = "#FFFFFF";
@@ -124,8 +119,8 @@ LRESULT		cfg_ledDirId[ws2812_led_dir_no];
 LPCTSTR		cfg_lineStyleStr[ws2812_line_style_no] = { L"Simple", L"Bars", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe", L"Oscillogram (hori)", L"Oscillogram (vert)" };
 LRESULT		cfg_lineStyleId[ws2812_line_style_no];
 
-// TODO number of entries should depend on enum line_style
-LPCTSTR		cfg_baudrateStr[ws2812_baudrate_no] = { L"9600", L"14400", L"19200", L"38400", L"56000", L"57600", L"115200" };
+// TODO number of entries should depend on enum ws2812_baudrate
+LPCTSTR		cfg_baudrateStr[ws2812_baudrate_no] = { L"9600", L"14400", L"19200", L"38400", L"56000", L"57600", L"115200", L"128000", L"250000", L"256000", L"500000" };
 LRESULT		cfg_baudrateId[ws2812_baudrate_no];
 
 static cfg_uint cfg_matrixRows(guid_cfg_matrixRows, default_cfg_matrixRows);
@@ -164,8 +159,6 @@ static cfg_string cfg_spectrogramColors(guid_cfg_spectrogram_colors, default_cfg
 static cfg_string cfg_oscilloscopeColors(guid_cfg_oscilloscope_colors, default_cfg_oscilloscopeColors);
 
 static advconfig_branch_factory g_advconfigBranch("WS2812 Output", guid_advconfig_branch, advconfig_branch::guid_branch_tools, 0);
-
-static advconfig_integer_factory cfg_bogoSetting3("Bogo setting 3", guid_cfg_bogoSetting3, guid_advconfig_branch, 0, default_cfg_bogoSetting3, 0 /*minimum value*/, 9999 /*maximum value*/);
 
 class CWS2812Preferences : public CDialogImpl<CWS2812Preferences>, public preferences_page_instance {
 public:

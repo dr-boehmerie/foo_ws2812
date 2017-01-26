@@ -65,6 +65,10 @@ enum ws2812_baudrate
 	ws2812_baudrate_56000,
 	ws2812_baudrate_57600,
 	ws2812_baudrate_115200,
+	ws2812_baudrate_128000,
+	ws2812_baudrate_250000,
+	ws2812_baudrate_256000,
+	ws2812_baudrate_500000,
 
 	ws2812_baudrate_no
 };
