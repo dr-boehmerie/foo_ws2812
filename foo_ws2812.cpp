@@ -2555,7 +2555,7 @@ bool ws2812::SetComPort(unsigned int port)
 bool SetComBaudrate(unsigned int baudrate)
 {
 	if (ws2812_global) {
-		return ws2812_global->SetComPort((enum ws2812_baudrate)baudrate);
+		return ws2812_global->SetComBaudrate((enum ws2812_baudrate)baudrate);
 	}
 	return false;
 }
