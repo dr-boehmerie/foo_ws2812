@@ -86,6 +86,15 @@ enum led_mode
 	ws2812_led_mode_no
 };
 
+enum led_colors
+{
+	ws2812_led_colors_grb,		// WS2812 default
+	ws2812_led_colors_brg,		// Renkforce (TM1829)
+	ws2812_led_colors_rgb,
+
+	ws2812_led_colors_no
+};
+
 enum ws2812_baudrate
 {
 	ws2812_baudrate_9600,
@@ -120,6 +129,9 @@ public:
 
 	void SetLineStyle(enum line_style style);
 	void GetLineStyle(unsigned int *style);
+
+	void SetLedColors(enum led_colors ledColors);
+	void GetLedColors(unsigned int *ledColors);
 
 	void SetScaling(int logFrequency, int logAmplitude, int peakValues);
 	void GetScaling(int *logFrequency, int *logAmplitude, int *peakValues);
@@ -234,6 +246,7 @@ private:
 	unsigned int		brightness;
 	enum led_mode		ledMode;
 	enum line_style		lineStyle;
+	enum led_colors		ledColors;
 
 	bool				logFrequency;
 	bool				logAmplitude;
@@ -292,6 +305,7 @@ bool GetOutputState(void);
 bool ConfigMatrix(int rows, int cols, int start_led, int led_dir);
 bool SetScaling(int logFrequency, int logAmplitude, int peakValues);
 bool SetLineStyle(unsigned int lineStyle);
+bool SetLedColors(unsigned int ledColors);
 bool SetBrightness(unsigned int brightness);
 
 bool SetAmplitudeMinMax(int min, int max);
@@ -309,6 +323,7 @@ bool GetScaling(int *logFrequency, int *logAmplitude, int *peakValues);
 bool GetInterval(unsigned int *interval);
 bool GetBrightness(unsigned int *brightness);
 bool GetLineStyle(unsigned int *lineStyle);
+bool GetLedColors(unsigned int *ledColors);
 bool GetMinAmplitudeIsOffset(void);
 bool GetMaxAmplitudeIsGain(void);
 
@@ -338,6 +353,7 @@ unsigned int GetCfgBrightness();
 unsigned int GetCfgUpdateInterval();
 unsigned int GetCfgStartLed();
 unsigned int GetCfgLedDirection();
+unsigned int GetCfgLedColors();
 
 unsigned int GetCfgLineStyle();
 unsigned int GetCfgLogFrequency();
@@ -362,6 +378,7 @@ bool SetCfgBrightness(unsigned int value);
 bool SetCfgUpdateInterval(unsigned int value);
 bool SetCfgStartLed(unsigned int value);
 bool SetCfgLedDirection(unsigned int value);
+bool SetCfgLedColors(unsigned int value);
 
 bool SetCfgLineStyle(unsigned int value);
 bool SetCfgLogFrequency(unsigned int value);

@@ -18,7 +18,6 @@
 #define IDC_STOP                        1006
 #define IDC_LINE_STYLE                  1006
 #define IDC_PREV                        1007
-#define IDC_COM_PORT2                   1007
 #define IDC_MATRIX_INFO                 1007
 #define IDC_NEXT                        1008
 #define IDC_RAND                        1009
@@ -32,8 +31,8 @@
 #define IDC_LED_DIR                     1016
 #define IDC_LOG_AMPL                    1017
 #define IDC_PEAK_VALS                   1018
-#define IDC_START_LED2                  1019
 #define IDC_COM_BAUDRATE                1019
+#define IDC_LED_COLORS                  1020
 #define IDC_STOP_OUTPUT                 1022
 #define IDC_START_OUTPUT                1023
 #define IDC_LOG_FREQUENCY               1024

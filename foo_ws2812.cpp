@@ -43,7 +43,7 @@ BOOL ws2812::OpenPort(LPCWSTR gszPort, unsigned int port)
 {
 	if (hComm == INVALID_HANDLE_VALUE) {
 		WCHAR	portStr[32];
-		LPCWSTR	format = L"COM%u";
+		LPCWSTR	format = L"\\\\.\\COM%u";
 
 		wsprintf(portStr, format, port);
 
@@ -634,11 +634,34 @@ void ws2812::ImageToBuffer(unsigned char *buffer, unsigned int bufferSize)
 {
 	unsigned int	i;
 	unsigned int	r, g, b;
+	unsigned int	r_i, g_i, b_i;
 	unsigned int	count;
 
 	count = bufferSize / 3;
 	if (count > ledNo)
 		count = ledNo;
+
+	switch (ledColors)
+	{
+	default:
+	case ws2812_led_colors_grb:
+		r_i = 1;
+		g_i = 0;
+		b_i = 2;
+		break;
+
+	case ws2812_led_colors_brg:
+		r_i = 1;
+		g_i = 2;
+		b_i = 0;
+		break;
+
+	case ws2812_led_colors_rgb:
+		r_i = 0;
+		g_i = 1;
+		b_i = 2;
+		break;
+	}
 
 	if (buffer && imageBuffer) {
 		for (i = 0; i < count; i++) {
@@ -648,15 +671,16 @@ void ws2812::ImageToBuffer(unsigned char *buffer, unsigned int bufferSize)
 			b = GET_COLOR_B(imageBuffer[i]);
 
 			// all values < 2 are replaced by 0 (1 is reserved for start of block)
-			if (r < 2)	r = 0;
-			if (g < 2)	g = 0;
-			if (b < 2)	b = 0;
+			// and clip to 250 max brightness
+			if (r < 2) r = 0; else if (r > 250) r = 250;
+			if (g < 2) g = 0; else if (g > 250) g = 250;
+			if (b < 2) b = 0; else if (b > 250) b = 250;
 
 			// write colors to buffer
-			// color ouput order is fixed to GRB
-			buffer[3 * i + 0] = (unsigned char)g;
-			buffer[3 * i + 1] = (unsigned char)r;
-			buffer[3 * i + 2] = (unsigned char)b;
+			// color ouput order for Renkforce is BRG
+			buffer[3 * i + r_i] = (unsigned char)r;
+			buffer[3 * i + g_i] = (unsigned char)g;
+			buffer[3 * i + b_i] = (unsigned char)b;
 		}
 	}
 }
@@ -2074,7 +2098,7 @@ bool ConfigMatrix(int rows, int cols, int start_led, int led_dir)
 
 bool ws2812::ConfigMatrix(int rows, int cols, enum start_led start_led, enum led_direction led_dir)
 {
-	bool	timerRunning;
+	bool	timerRunning = false;
 
 	// allow change of one dimension only, the other must be < 0
 	if (rows < 0)
@@ -2100,17 +2124,17 @@ bool ws2812::ConfigMatrix(int rows, int cols, enum start_led start_led, enum led
 
 			// allocate buffers
 			initDone = AllocateBuffers();
-			if (initDone) {
-				if (timerRunning) {
-					StartTimer();
-				}
-			}
 		}
 
 		if (initDone) {
 			// update led mode
 			ledMode = GetLedMode(start_led, led_dir);
 			InitIndexLut();
+
+			// restart the output timer
+			if (timerRunning) {
+				StartTimer();
+			}
 		}
 	}
 	return initDone;
@@ -2446,6 +2470,46 @@ bool GetLineStyle(unsigned int *lineStyle)
 	return false;
 }
 
+void ws2812::GetLineStyle(unsigned int *lineStyle)
+{
+	if (lineStyle != NULL)
+		*lineStyle = (unsigned int)this->lineStyle;
+}
+
+bool SetLedColors(unsigned int ledColors)
+{
+	if (ws2812_global) {
+		ws2812_global->SetLedColors((enum led_colors)ledColors);
+
+		return true;
+	}
+	return false;
+}
+
+void ws2812::SetLedColors(enum led_colors ledColors)
+{
+	bool	timerRunning;
+
+	if (ledColors >= 0 && ledColors < ws2812_led_colors_no) {
+		this->ledColors = ledColors;
+	}
+}
+
+bool GetLedColors(unsigned int *ledColors)
+{
+	if (ws2812_global) {
+		ws2812_global->GetLedColors(ledColors);
+		return true;
+	}
+	return false;
+}
+
+void ws2812::GetLedColors(unsigned int *ledColors)
+{
+	if (ledColors != NULL)
+		*ledColors = (unsigned int)this->ledColors;
+}
+
 bool GetMinAmplitudeIsOffset(void)
 {
 	unsigned int	lineStyle = 0;
@@ -2478,12 +2542,6 @@ bool GetMaxAmplitudeIsGain(void)
 		}
 	}
 	return false;
-}
-
-void ws2812::GetLineStyle(unsigned int *lineStyle)
-{
-	if (lineStyle != NULL)
-		*lineStyle = (unsigned int)this->lineStyle;
 }
 
 bool SetBrightness(unsigned int brightness)
@@ -3290,7 +3348,7 @@ ws2812::ws2812()
 			const char *colors = NULL;
 
 			tmp = GetCfgLineStyle();
-			if (tmp > ws2812_line_style_no)
+			if (tmp >= ws2812_line_style_no)
 				tmp = ws2812_spectrum_simple;
 
 			SetLineStyle((enum line_style)tmp);
@@ -3300,6 +3358,12 @@ ws2812::ws2812()
 			peakValues = GetCfgPeakValues() != 0;
 
 			ledMode = GetLedMode(GetCfgStartLed(), GetCfgLedDirection());
+
+			tmp = GetCfgLedColors();
+			if (tmp >= ws2812_led_colors_no)
+				ledColors = ws2812_led_colors_grb;
+			else
+				ledColors = (enum led_colors)tmp;
 
 			InitIndexLut();
 
@@ -3401,6 +3465,7 @@ ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, enum ws2
 			peakValues = true;
 
 			ledMode = GetLedMode(0, 0);
+			ledColors = ws2812_led_colors_grb;
 
 			InitIndexLut();
 

@@ -56,6 +56,8 @@ static const GUID guid_cfg_comBaudrate = { 0x1b573bd, 0x9c6f, 0x4211,{ 0x85, 0xf
 static const GUID guid_cfg_startLed = { 0x556a3c73, 0xb652, 0x4fab,{ 0xbc, 0xb2, 0x13, 0x40, 0xaa, 0xe7, 0x42, 0xf6 } };
 // {D4F9F718-E38B-4847-93F0-C6BC6008987C}
 static const GUID guid_cfg_ledDirection = { 0xd4f9f718, 0xe38b, 0x4847,{ 0x93, 0xf0, 0xc6, 0xbc, 0x60, 0x8, 0x98, 0x7c } };
+// {5DA05EE9-A90D-4F65-B0A8-6BAA5F0EF400}
+static const GUID guid_cfg_ledColors = { 0x5da05ee9, 0xa90d, 0x4f65,{ 0xb0, 0xa8, 0x6b, 0xaa, 0x5f, 0xe, 0xf4, 0x0 } };
 // {3B6337F1-538D-480A-84A3-5527FCE35A83}
 static const GUID guid_cfg_lineStyle = { 0x3b6337f1, 0x538d, 0x480a,{ 0x84, 0xa3, 0x55, 0x27, 0xfc, 0xe3, 0x5a, 0x83 } };
 // {5F9CF2D6-331D-4EE1-9845-BB3E72CD08D3}
@@ -108,8 +110,9 @@ enum {
 	default_cfg_updateInterval = ws2812::timerInterval_def,
 	default_cfg_comPort = ws2812::port_def,
 	default_cfg_comBaudrate = ws2812_baudrate_115200,
-	default_cfg_startLed = 0,
-	default_cfg_ledDirection = 0,
+	default_cfg_startLed = ws2812_top_left,
+	default_cfg_ledDirection = ws2812_led_dir_common,
+	default_cfg_ledColors = ws2812_led_colors_grb,
 
 	default_cfg_lineStyle = ws2812_spectrum_simple,
 	default_cfg_logFrequency = 1,
@@ -147,6 +150,10 @@ LRESULT		cfg_startLedId[ws2812_start_led_no];
 LPCTSTR		cfg_ledDirStr[ws2812_led_dir_no] = { L"Common", L"Alternating" };
 LRESULT		cfg_ledDirId[ws2812_led_dir_no];
 
+// TODO number of entries should depend on enum led_colors
+LPCTSTR		cfg_ledColorsStr[ws2812_led_colors_no] = { L"GRB", L"BRG", L"RGB" };
+LRESULT		cfg_ledColorsId[ws2812_led_colors_no];
+
 // TODO number of entries should depend on enum line_style
 LPCTSTR		cfg_lineStyleStr[ws2812_line_style_no] = { L"Simple", L"Bars", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe", L"Oscillogram (hori)", L"Oscillogram (vert)" };
 LRESULT		cfg_lineStyleId[ws2812_line_style_no];
@@ -163,6 +170,7 @@ static cfg_uint cfg_comPort(guid_cfg_comPort, default_cfg_comPort);
 static cfg_uint cfg_comBaudrate(guid_cfg_comBaudrate, default_cfg_comBaudrate);
 static cfg_uint cfg_startLed(guid_cfg_startLed, default_cfg_startLed);
 static cfg_uint cfg_ledDirection(guid_cfg_ledDirection, default_cfg_ledDirection);
+static cfg_uint cfg_ledColors(guid_cfg_ledColors, default_cfg_ledColors);
 
 static cfg_uint cfg_lineStyle(guid_cfg_lineStyle, default_cfg_lineStyle);
 static cfg_uint cfg_logFrequency(guid_cfg_logFrequency, default_cfg_logFrequency);
@@ -219,6 +227,7 @@ public:
 		COMMAND_HANDLER_EX(IDC_COM_PORT, EN_CHANGE, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_START_LED, CBN_SELCHANGE, OnCBChange)
 		COMMAND_HANDLER_EX(IDC_LED_DIR, CBN_SELCHANGE, OnCBChange)
+		COMMAND_HANDLER_EX(IDC_LED_COLORS, CBN_SELCHANGE, OnCBChange)
 		COMMAND_HANDLER_EX(IDC_LINE_STYLE, CBN_SELCHANGE, OnCBChange)
 		COMMAND_HANDLER_EX(IDC_COM_BAUDRATE, CBN_SELCHANGE, OnCBChange)
 		COMMAND_HANDLER_EX(IDC_LOG_FREQ, BN_CLICKED, OnEditChange)
@@ -278,6 +287,17 @@ BOOL CWS2812Preferences::OnInitDialog(CWindow, LPARAM) {
 		cfg_ledDirId[n] = SendDlgItemMessage(IDC_LED_DIR, CB_ADDSTRING, 0, (DWORD)str);
 	}
 	SendDlgItemMessage(IDC_LED_DIR, CB_SETCURSEL, cfg_ledDirId[cfg_ledDirection], 0);
+
+	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_ledColorsId); n++) {
+		WCHAR	str[64];
+
+		if (cfg_ledColorsStr[n])
+			StrCpy(str, cfg_ledColorsStr[n]);
+		else
+			StrCpy(str, L"?");
+		cfg_ledColorsId[n] = SendDlgItemMessage(IDC_LED_COLORS, CB_ADDSTRING, 0, (DWORD)str);
+	}
+	SendDlgItemMessage(IDC_LED_COLORS, CB_SETCURSEL, cfg_ledColorsId[cfg_ledColors], 0);
 
 	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_lineStyleId); n++) {
 		WCHAR	str[64];
@@ -357,6 +377,7 @@ void CWS2812Preferences::reset() {
 
 	SendDlgItemMessage(IDC_START_LED, CB_SETCURSEL, cfg_startLedId[default_cfg_startLed], 0);
 	SendDlgItemMessage(IDC_LED_DIR, CB_SETCURSEL, cfg_ledDirId[default_cfg_ledDirection], 0);
+	SendDlgItemMessage(IDC_LED_COLORS, CB_SETCURSEL, cfg_ledColorsId[default_cfg_ledColors], 0);
 	SendDlgItemMessage(IDC_LINE_STYLE, CB_SETCURSEL, cfg_lineStyleId[default_cfg_lineStyle], 0);
 	SendDlgItemMessage(IDC_COM_BAUDRATE, CB_SETCURSEL, cfg_baudrateId[default_cfg_comBaudrate], 0);
 
@@ -441,6 +462,15 @@ void CWS2812Preferences::apply() {
 			break;
 		}
 	}
+	r = SendDlgItemMessage(IDC_LED_COLORS, CB_GETCURSEL, 0, 0);
+	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_ledColorsId); n++) {
+		if (r == cfg_ledColorsId[n]) {
+			changed |= (cfg_ledColors != n);
+			cfg_ledColors = n;
+			break;
+		}
+	}
+
 	r = SendDlgItemMessage(IDC_LINE_STYLE, CB_GETCURSEL, 0, 0);
 //	r = ComboBox_GetCurSel(IDC_LINE_STYLE);
 	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_lineStyleId); n++) {
@@ -487,6 +517,7 @@ void CWS2812Preferences::apply() {
 
 	// write configuration values into the driver
 	ConfigMatrix(cfg_matrixRows, cfg_matrixCols, cfg_startLed, cfg_ledDirection);
+	SetLedColors(cfg_ledColors);
 	SetBrightness(cfg_brightness);
 	SetInterval(cfg_updateInterval);
 	SetComPort(cfg_comPort);
@@ -645,6 +676,11 @@ unsigned int GetCfgStartLed()
 unsigned int GetCfgLedDirection()
 {
 	return cfg_ledDirection;
+}
+
+unsigned int GetCfgLedColors()
+{
+	return cfg_ledColors;
 }
 
 unsigned int GetCfgLineStyle()
@@ -815,6 +851,17 @@ bool SetCfgLedDirection(unsigned int value)
 {
 	if (cfg_ledDirection != value) {
 		cfg_ledDirection = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgLedColors(unsigned int value)
+{
+	if (cfg_ledColors != value) {
+		cfg_ledColors = value;
 		return true;
 	}
 	else {

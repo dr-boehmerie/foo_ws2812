@@ -34,13 +34,28 @@
 // "DDRD" and "6", respectively.                                               #
 //                                                                             #
 //##############################################################################
-// Arduino Micro D5: PC6
-#define DATA_PORT          PORTC
-#define DATA_DDR           DDRC						
-#define DATA_PIN           6							
-#define NUMBER_OF_PIXELS   240
 
 #define USE_SERIAL_LIB     1
+#define USE_TM1829         1
+
+// Arduino Micro D5: PC6
+#define DATA_PORT          PORTC
+#define DATA_DDR           DDRC
+#define DATA_PIN           6
+
+#if USE_TM1829
+// Renkforce TM1829 5m Digital LED Stripe
+#define NUMBER_OF_PIXELS   50
+#else
+// WS2812 5m LED Stripe
+#define NUMBER_OF_PIXELS   240
+#endif
+
+// Arduino Micro LED IO13: PC7
+// indicates active output
+#define LED_PORT            PORTC
+#define LED_DDR             DDRC
+#define LED_PIN             7              
 
 //##############################################################################
 //                                                                             #
@@ -48,11 +63,13 @@
 //                                                                             #
 //##############################################################################
 
-unsigned char display_buffer[NUMBER_OF_PIXELS * 3];
-static unsigned char *ptr;
-static unsigned int pos = 0;
+uint8_t display_buffer[NUMBER_OF_PIXELS * 3];
+static uint8_t *ptr = display_buffer;
+static uint16_t pos = 0;
 
-volatile unsigned char go = 0;
+volatile uint8_t go = 0;
+
+
 
 
 //##############################################################################
@@ -66,9 +83,21 @@ void setup()
   // Set data pin as output
   DATA_DDR |= (1 << DATA_PIN);
 
+#if defined LED_PIN
+  // Set LED pin as output
+  LED_DDR |= (1 << LED_PIN);
+#endif
+
   // clear LEDs
   cli();
-  ws2812_sendarray(display_buffer, NUMBER_OF_PIXELS * 3); 
+#if USE_TM1829
+  // Reset pulse => output high for typ. 500us
+  DATA_PORT |= (1 << DATA_PIN);
+  _delay_us(500);
+  tm1829_sendarray(display_buffer, NUMBER_OF_PIXELS * 3);
+#else
+  ws2812_sendarray(display_buffer, NUMBER_OF_PIXELS * 3);
+#endif
   sei();
   
 #if USE_SERIAL_LIB
@@ -83,8 +112,6 @@ void setup()
   UBRR0H = 0;
   UBRR0L = 1; //Baud Rate 1 MBit (at F_CPU = 16MHz)
 #endif
-
-  ptr = display_buffer;
 }
 
 
@@ -98,17 +125,16 @@ void loop()
 {
 #if USE_SERIAL_LIB
   if (Serial.available()) {
-    unsigned char b = Serial.read();
+    uint8_t b = Serial.read();
     
     if (b == 1) {
-	  // start of frame
+	    // start of frame
       pos = 0;
       ptr = display_buffer;
     } else {
-	  // RGB bytes, can not contain the value 1, for this is used as the start of frame signal!
+	    // RGB bytes, must not contain the value 1, for this is used as the start of frame signal!
       if (pos < (NUMBER_OF_PIXELS * 3)) {
-        *ptr = b;
-        ptr++;
+        *ptr++ = b;
         pos++;
       }
       if (pos == (NUMBER_OF_PIXELS * 3)) {
@@ -119,12 +145,23 @@ void loop()
   }
 #endif // USE_SERIAL_LIB
 
-  if (go == 1) 
-  {
+  if (go != 0) {
+#if defined LED_PIN
+    LED_PORT |= (1 << LED_PIN);
+#endif
+
     cli();
-    ws2812_sendarray(display_buffer, NUMBER_OF_PIXELS * 3); 
+#if USE_TM1829
+    tm1829_sendarray(display_buffer, NUMBER_OF_PIXELS * 3);
+#else
+    ws2812_sendarray(display_buffer, NUMBER_OF_PIXELS * 3);
+#endif
     sei();
     go = 0;
+    
+#if defined LED_PIN
+    LED_PORT &= ~(1 << LED_PIN);
+#endif
   }
 }
 
@@ -144,7 +181,7 @@ ISR(USART_RX_vect)
   if (pos == (NUMBER_OF_PIXELS*3)) {} else {*ptr=b; ptr++; pos++;}  
   if (pos == ((NUMBER_OF_PIXELS*3)-1)) {go=1;}
 }
-#endif
+#endif  // !USE_SERIAL_LIB
 
 //##############################################################################
 //                                                                             #
@@ -166,6 +203,9 @@ void ws2812_sendarray(uint8_t *data,uint16_t datlen)
   {
     curbyte = *data++;
 
+    // 1CK = 62.5ns
+    // 0 = 375n (6CK)  H, 875n (14CK) L
+    // 1 = 625n (10CK) H, 625n (10CK) L
     asm volatile
     (
       "		ldi %0,8	\n\t"		// 0
@@ -189,6 +229,75 @@ void ws2812_sendarray(uint8_t *data,uint16_t datlen)
     );
   }
 
+}
+
+
+//##############################################################################
+//                                                                             #
+// RenkForce RGB output routine = WS2812 output routine modified by MBC        #
+// source see above                                                            #
+// Requires F_CPU = 16MHz                                                      #
+//                                                                             #
+//##############################################################################
+
+void tm1829_sendarray(uint8_t *data, uint16_t datlen)
+{
+  uint8_t curbyte, ctr;
+  uint8_t maskhi, masklo;
+  
+  masklo = ~_BV(DATA_PIN) & DATA_PORT;
+  maskhi =  _BV(DATA_PIN) | DATA_PORT;
+
+  // output pin is idle high
+  
+  while (datlen--)      // ?CK
+  {
+    curbyte = *data++;  // ?CK
+    
+    // 1CK = 62.5ns
+    // 0 = 1875n (30CK) H, 250n (4CK)  L
+    // 1 = 1625n (26CK) H, 750n (12CK) L
+    asm volatile
+    (
+      "        ldi  %0,8        \n"   // ldi ctr,8 (1CK)
+      "loop%=: out  %2, %3      \n"   // out DATA_PORT, maskhi (1CK)
+      "        lsl  %1          \n"   // lsl curbyte (shifts Bit7 into C) (1CK)
+      "        dec  %0          \n"   // dec ctr (1CK)
+      "        rjmp .+0         \n"   // relative jump to next instruction (2CK)
+      "        rjmp .+0         \n"   // (2CK)
+      "        rjmp .+0         \n"   // (2CK)
+      "        rjmp .+0         \n"   // (2CK)
+      "        rjmp .+0         \n"   // (2CK)
+      "        rjmp .+0         \n"   // (2CK) 14CK
+//      "        rjmp .+0         \n"   // (2CK) 16CK
+//      "        rjmp .+0         \n"   // (2CK) 18CK
+//      "        rjmp .+0         \n"   // (2CK) 20CK
+//      "        rjmp .+0         \n"   // (2CK) 22CK
+//      "        rjmp .+0         \n"   // (2CK) 24CK
+      "        brcc msb0%=      \n"   // branch to msb0 if carry is cleared (1/2CK)
+      "msb1%=: out  %2,%4       \n"   // out DATA_PORT, masklo (1CK) 26CK if C == 1
+      "        rjmp .+0         \n"   // (2CK)
+      "        rjmp .+0         \n"   // (2CK)
+      "        nop              \n"   // (1CK)
+      "msb0%=: rjmp .+0         \n"   // (2CK)
+      "        nop              \n"   // (1CK)
+      "        out  %2,%4       \n"   // out DATA_PORT, masklo (1CK) 30CK if C == 0
+      "        nop              \n"   // (1CK)
+      "        rjmp .+0         \n"   // (2CK)
+      "        out  %2,%3       \n"   // out DATA_PORT, maskhi (1CK) 4CK if C == 0, 12CK if CK == 1
+      "        breq end%=       \n"   // branch to end if equal (z == 1 -> ctr == 0) (1/2CK)
+//      "        rjmp .+0         \n"   // (2CK)
+//      "        rjmp .+0         \n"   // (2CK)
+//      "        nop              \n"   // (1CK)
+      "        rjmp .+0         \n"   // (2CK)
+      "        rjmp .+0         \n"   // (2CK)
+      "        rjmp .+0         \n"   // (2CK)
+      "        rjmp loop%=      \n"   // back to loop (2CK)
+      "end%=:                   \n" 
+      : "=&d" (ctr)
+      : "r" (curbyte), "I" (_SFR_IO_ADDR(DATA_PORT)), "r" (maskhi), "r" (masklo)
+    );
+  }
 }
 
 
