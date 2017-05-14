@@ -1812,7 +1812,7 @@ void ws2812::CalcAndOutput(void)
 	timerActive = true;
 
 	// get current track time
-	if (visStream->get_absolute_time(abs_time)) {
+	if (visStream != nullptr && visStream->get_absolute_time(abs_time)) {
 		audio_chunk_fast_impl	chunk;
 
 		switch (lineStyle)
@@ -3306,9 +3306,10 @@ ws2812::ws2812()
 	timerActive = false;
 	initDone = false;
 
-	// ask the global visualisation manager to create a stream for us
-	static_api_ptr_t<visualisation_manager>()->create_stream(visStream, visualisation_manager::KStreamFlagNewFFT);
-
+//	if (visStream == nullptr) {
+		// ask the global visualisation manager to create a stream for us
+		static_api_ptr_t<visualisation_manager>()->create_stream(visStream, visualisation_manager::KStreamFlagNewFFT);
+//	}
 	// I probably should test this
 	if (visStream != nullptr) {
 		// mono is preferred, unless you want to use two displays ;-)
@@ -3413,9 +3414,10 @@ ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, enum ws2
 	timerActive = false;
 	initDone = false;
 
-	// ask the global visualisation manager to create a stream for us
-	static_api_ptr_t<visualisation_manager>()->create_stream(visStream, visualisation_manager::KStreamFlagNewFFT);
-
+//	if (visStream == nullptr) {
+		// ask the global visualisation manager to create a stream for us
+		static_api_ptr_t<visualisation_manager>()->create_stream(visStream, visualisation_manager::KStreamFlagNewFFT);
+//	}
 	// I probably should test this
 	if (visStream != nullptr) {
 		// mono is preferred, unless you want to use two displays ;-)
@@ -3503,6 +3505,7 @@ ws2812::~ws2812()
 
 	// how to delete the stream?
 //	delete visStream;
+	visStream = nullptr;
 
 	// kill the timer
 	StopTimer();
