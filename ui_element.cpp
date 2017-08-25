@@ -12,6 +12,7 @@ public:
 		m_state = "";
 		m_timerId = -1;
 		m_timerInterval = 100;
+		m_xyRc = { 0, 0, 100, 100 };
 
 		// ask the global visualisation manager to create a stream for us
 		if (m_visStream == nullptr) {
@@ -61,7 +62,9 @@ private:
 
 	ui_element_config::ptr m_config;
 	HWND m_parent;
-	HDC m_hdc;
+	HDC m_xyDc;
+	CRect m_xyRc;
+	CRect m_textRc;
 	int m_timerId;
 	UINT32 m_timerInterval;
 
@@ -87,7 +90,8 @@ private:
 
 	static_api_ptr_t<playback_control> m_playback_control;
 
-	service_ptr_t<visualisation_stream_v3>	m_visStream;
+	service_ptr_t<visualisation_stream_v3> m_visStream;
+
 
 protected:
 	// this must be declared as protected for ui_element_impl_withpopup<> to work.
@@ -139,8 +143,32 @@ void CWS2812ElemWindow::OnPaint(CDCHandle)
 
 LRESULT CWS2812ElemWindow::OnCreate(LPCREATESTRUCT para)
 {
+	CRect rc;
+	LONG length;
+
+	// Calculate the starting point.  
+	WIN32_OP_D(GetClientRect(&rc));
+
+	length = rc.Height();
+	if (length > rc.Width())
+		length = rc.Width();
+
+	// 10% off in every direction
+	m_xyRc.left = rc.left + length / 10;
+	m_xyRc.top = rc.top + length / 10;
+
+	m_textRc.left = rc.left;
+	m_textRc.top = rc.top;
+	m_textRc.right = rc.left + length;
+	m_textRc.bottom = rc.top + length / 10;
+
+	length -= length / 5;
+	m_xyRc.right = m_xyRc.left + length;
+	m_xyRc.bottom = m_xyRc.top + length;
+
 	// Initialize the private DC.
-	m_hdc = GetDC();
+	m_xyDc = GetDC();
+//	WIN32_OP_D(SetViewportOrgEx(m_xyDc, m_xyRc.left, m_xyRc.top, NULL));
 
 	return 0L;
 }
@@ -155,6 +183,9 @@ LRESULT CWS2812ElemWindow::OnTimer(UINT id)
 
 LRESULT CWS2812ElemWindow::OnSize(UINT wParam, CSize size)
 {
+	CRect rc;
+	LONG length;
+
 	switch (wParam)
 	{
 	case SIZE_MINIMIZED:
@@ -164,6 +195,28 @@ LRESULT CWS2812ElemWindow::OnSize(UINT wParam, CSize size)
 		break;
 
 	case SIZE_RESTORED:
+		// update xy rect
+		WIN32_OP_D(GetClientRect(&rc));
+
+		length = rc.Height();
+		if (length > rc.Width())
+			length = rc.Width();
+
+		// 10% off in every direction
+		m_xyRc.left = rc.left + length / 10;
+		m_xyRc.top = rc.top + length / 10;
+
+		m_textRc.left = rc.left;
+		m_textRc.top = rc.top;
+		m_textRc.right = rc.left + length;
+		m_textRc.bottom = rc.top + length / 10;
+
+		length -= length / 5;
+		m_xyRc.right = m_xyRc.left + length;
+		m_xyRc.bottom = m_xyRc.top + length;
+
+	//	WIN32_OP_D(SetViewportOrgEx(m_xyDc, m_xyRc.left, m_xyRc.top, NULL));
+
 		// Fall through to the next case.
 	case SIZE_MAXIMIZED:
 		// Start the timer if it had been stopped.  
@@ -210,18 +263,18 @@ void CWS2812ElemWindow::update() {
 
 	//	BeginPaint(&ps);
 
-		CRect rc;
-		WIN32_OP_D(GetClientRect(&rc));
+		CRect rc = m_textRc;
+	//	WIN32_OP_D(GetClientRect(&rc));
 
 		if (redraw) {
 			CBrush brush;
 			WIN32_OP_D(brush.CreateSolidBrush(m_callback->query_std_color(ui_color_background)) != NULL);
-			WIN32_OP_D(FillRect(m_hdc, &rc, brush));
+			WIN32_OP_D(FillRect(m_xyDc, &rc, brush));
 		}
-		SetTextColor(m_hdc, m_callback->query_std_color(ui_color_text));
-		SetBkMode(m_hdc, OPAQUE);
+		SetTextColor(m_xyDc, m_callback->query_std_color(ui_color_text));
+		SetBkMode(m_xyDc, OPAQUE);
 
-		SelectObjectScope fontScope(m_hdc, (HGDIOBJ)m_callback->query_font_ex(ui_font_default));
+		SelectObjectScope fontScope(m_xyDc, (HGDIOBJ)m_callback->query_font_ex(ui_font_default));
 		const UINT format = DT_NOPREFIX | /*DT_CENTER | DT_VCENTER |*/ DT_SINGLELINE;
 
 		rc.MoveToXY(10, 10);
@@ -229,7 +282,7 @@ void CWS2812ElemWindow::update() {
 		// string8 needs to be converted to wchar
 		WCHAR wtemp[100];
 		WIN32_OP_D(mbstowcs_s(NULL, wtemp, m_state.c_str(), m_state.length()) == 0);
-		WIN32_OP_D(DrawText(m_hdc, wtemp, -1, &rc, format) > 0);
+		WIN32_OP_D(DrawText(m_xyDc, wtemp, -1, &rc, format) > 0);
 
 	//	UpdateXY();
 	//	EndPaint(&ps);
@@ -249,9 +302,6 @@ void CWS2812ElemWindow::update() {
 void CWS2812ElemWindow::UpdateXY(void)
 {
 	if (::IsWindowVisible(get_wnd())) {
-		CRect rc;
-		WIN32_OP_D(GetClientRect(&rc));
-
 		if (m_visStream != nullptr && m_playback_control->is_playing()) {
 			double	abs_time;
 
@@ -286,24 +336,24 @@ void CWS2812ElemWindow::UpdateXY(void)
 					COLORREF		bg = m_callback->query_std_color(ui_color_background);
 
 					// calc output window
-					if (rc.Height() < rc.Width())
-						length = rc.Height();
-					else
-						length = rc.Width();
+					length = m_xyRc.Height();
 
 					// 10% off in every direction
-					x0 = rc.left + length / 10;
-					y0 = rc.top + length / 10;
-					length -= length / 5;
+					x0 = m_xyRc.left;	// m_xyRc.left + length / 10;
+					y0 = m_xyRc.top;	// m_xyRc.top + length / 10;
+				//	length -= length / 5;
 					m = (audio_sample)length / 2;
 					n = (int)m;
 
+					// update viewport
+				//	WIN32_OP_D(SetViewportOrgEx(m_xyDc, m_xyRc.left, m_xyRc.top, NULL));
+
 					// clear background
 					CBrush brush;
-					CRect rcbg;
-					rcbg.SetRect(x0, y0, x0 + length, y0 + length);
+					CRect rcbg = m_xyRc;
+				//	rcbg.SetRect(x0, y0, x0 + length, y0 + length);
 					WIN32_OP_D(brush.CreateSolidBrush(bg) != NULL);
-					WIN32_OP_D(FillRect(m_hdc, &rcbg, brush));
+					WIN32_OP_D(FillRect(m_xyDc, &rcbg, brush));
 
 					// center position
 					x0 += n;
@@ -321,7 +371,7 @@ void CWS2812ElemWindow::UpdateXY(void)
 								x = x0 + (int)(m * sx);
 								y = y0 - (int)(m * sy);
 
-								SetPixel(m_hdc, x, y, fg);
+								SetPixel(m_xyDc, x, y, fg);
 							}
 						}
 					}

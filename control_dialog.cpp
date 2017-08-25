@@ -67,7 +67,8 @@ public:
 		COMMAND_HANDLER_EX(IDC_STYLE_5, BN_CLICKED, OnStyleClicked)
 		COMMAND_HANDLER_EX(IDC_STYLE_6, BN_CLICKED, OnStyleClicked)
 		COMMAND_HANDLER_EX(IDC_STYLE_7, BN_CLICKED, OnStyleClicked)
-		MSG_WM_CONTEXTMENU(OnContextMenu)
+		COMMAND_HANDLER_EX(IDC_STYLE_8, BN_CLICKED, OnStyleClicked)
+//		MSG_WM_CONTEXTMENU(OnContextMenu)
 	END_MSG_MAP()
 private:
 
@@ -111,7 +112,7 @@ private:
 	void OnStartOutputClicked(UINT, int, CWindow);
 	void OnStopOutputClicked(UINT, int, CWindow);
 
-	void OnContextMenu(CWindow wnd, CPoint point);
+//	void OnContextMenu(CWindow wnd, CPoint point);
 
 	BOOL OnInitDialog(CWindow, LPARAM);
 //	void OnHScroll(UINT, UINT, CScrollBar);
@@ -280,7 +281,7 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 
 		if (GetMinAmplitudeIsOffset()) {
 			// this value is used as offset
-			_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)val / 100.0);
+			_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)val / (double)ws2812::offset_oscilloscope_div);
 		}
 		else {
 			_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, val);
@@ -298,7 +299,7 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 
 		if (GetMaxAmplitudeIsGain()) {
 			// this value is used as gain
-			_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)val / 10.0);
+			_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)val / (double)ws2812::gain_oscilloscope_div);
 		}
 		else {
 			_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, val);
@@ -376,7 +377,7 @@ void CWS2812ControlDialog::UpdateFrequencyAmplitudeSlider(void)
 		m_slider_ampl_min.SetTicFreq((ws2812::offset_oscilloscope_max - ws2812::offset_oscilloscope_min) / 10);
 		m_slider_ampl_min.SetPos(amin);
 
-		_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)amin / 100.0);
+		_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)amin / (double)ws2812::offset_oscilloscope_div);
 		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
 	}
 	else {
@@ -389,12 +390,12 @@ void CWS2812ControlDialog::UpdateFrequencyAmplitudeSlider(void)
 	}
 
 	if (GetMaxAmplitudeIsGain()) {
-		// gain: 10 ... 100 -> 1.0 ... 10.0
+		// gain: 1 ... 100 -> 0.1 ... 10.0
 		m_slider_ampl_max.SetRange(ws2812::gain_oscilloscope_min, ws2812::gain_oscilloscope_max, TRUE);
 		m_slider_ampl_max.SetTicFreq((ws2812::gain_oscilloscope_max - ws2812::gain_oscilloscope_min) / 10);
 		m_slider_ampl_max.SetPos(amax);
 
-		_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)amax / 10.0);
+		_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)amax / (double)ws2812::gain_oscilloscope_div);
 		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
 
 		// frequency limits not applicable
@@ -432,6 +433,7 @@ void CWS2812ControlDialog::OnStyleClicked(UINT code, int id, CWindow hwnd)
 	case IDC_STYLE_5:	style = 5;		break;
 	case IDC_STYLE_6:	style = 6;		break;
 	case IDC_STYLE_7:	style = 7;		break;
+	case IDC_STYLE_8:	style = 8;		break;
 	default:
 		r = false;
 		break;
@@ -450,7 +452,8 @@ void CWS2812ControlDialog::OnStyleClicked(UINT code, int id, CWindow hwnd)
 			case ws2812_spectrum_fire_lines:		colors = GetCfgSpectrumFireColors();	break;
 			case ws2812_spectrogram_horizontal:		colors = GetCfgSpectrogramColors();		break;
 			case ws2812_spectrogram_vertical:		colors = GetCfgSpectrogramColors();		break;
-			case ws2812_oscilloscope:				colors = GetCfgOscilloscopeColors();	break;
+			case ws2812_oscilloscope_yt:			colors = GetCfgOscilloscopeColors();	break;
+			case ws2812_oscilloscope_xy:			colors = GetCfgOscilloscopeColors();	break;
 			case ws2812_oscillogram_horizontal:		colors = GetCfgOscilloscopeColors();	break;
 			case ws2812_oscillogram_vertical:		colors = GetCfgOscilloscopeColors();	break;
 			}
@@ -562,6 +565,7 @@ BOOL CWS2812ControlDialog::OnInitDialog(CWindow, LPARAM) {
 	case 5:		r = SendDlgItemMessage(IDC_STYLE_5, BM_SETCHECK, BST_CHECKED, 0);		break;
 	case 6:		r = SendDlgItemMessage(IDC_STYLE_6, BM_SETCHECK, BST_CHECKED, 0);		break;
 	case 7:		r = SendDlgItemMessage(IDC_STYLE_7, BM_SETCHECK, BST_CHECKED, 0);		break;
+	case 8:		r = SendDlgItemMessage(IDC_STYLE_8, BM_SETCHECK, BST_CHECKED, 0);		break;
 	default:
 		break;
 	}
@@ -651,6 +655,7 @@ void CWS2812ControlDialog::update() {
 	uSetDlgItemText(*this, IDC_STATE, state);
 }
 
+#if 0
 void CWS2812ControlDialog::OnContextMenu(CWindow wnd, CPoint point) {
 	try {
 		if (wnd == GetDlgItem(IDC_CONTEXTMENU)) {
@@ -709,6 +714,7 @@ void CWS2812ControlDialog::OnContextMenu(CWindow wnd, CPoint point) {
 		console::complain("Context menu failure", e); //rare
 	}
 }
+#endif
 
 void RunWS2812ControlDialog() {
 	try {

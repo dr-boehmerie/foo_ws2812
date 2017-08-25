@@ -2,12 +2,9 @@
 // Microsoft Visual C++ generated include file.
 // Used by foo_ws2812.rc
 //
-#define IDD_PLAYBACK_STATE              101
-#define IDD_DSP                         102
 #define IDD_MYPREFERENCES               148
 #define IDD_CONTROL_DIALOG              149
 #define IDC_MATRIX_ROWS                 1001
-#define IDC_PATTERN                     1002
 #define IDC_MATRIX_COLS                 1002
 #define IDC_STATE                       1003
 #define IDC_COM_PORT                    1003
@@ -21,11 +18,7 @@
 #define IDC_MATRIX_INFO                 1007
 #define IDC_NEXT                        1008
 #define IDC_RAND                        1009
-#define IDC_CONTEXTMENU                 1010
 #define IDC_SAVE_CFG                    1010
-#define IDC_SLIDER                      1012
-#define IDC_SLIDER_LABEL                1013
-#define IDC_OUTPUT                      1014
 #define IDC_LOG_FREQ                    1014
 #define IDC_START_LED                   1015
 #define IDC_LED_DIR                     1016
@@ -63,6 +56,7 @@
 #define IDC_TXT_OSCILLOSCOPE_COLORS     1045
 #define IDC_STYLE_6                     1045
 #define IDC_STYLE_7                     1046
+#define IDC_STYLE_8                     1047
 
 // Next default values for new objects
 // 

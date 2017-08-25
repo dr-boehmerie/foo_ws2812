@@ -46,7 +46,8 @@ enum line_style
 	ws2812_spectrogram_horizontal,		// spectrogram, moving horizontally
 	ws2812_spectrogram_vertical,		// spectrogram, moving vertically
 
-	ws2812_oscilloscope,				// oscilloscope, single colored
+	ws2812_oscilloscope_yt,				// oscilloscope, single colored, yt-mode
+	ws2812_oscilloscope_xy,				// oscilloscope, single colored, xy-mode
 
 	ws2812_oscillogram_horizontal,		// oscillogram, moving horizontally
 	ws2812_oscillogram_vertical,		// oscillogram, moving vertically
@@ -193,10 +194,11 @@ private:
 	void ImageScrollDown(void);
 
 	void OutputTest(const audio_sample *psample, unsigned int samples, audio_sample peak, unsigned char *buffer, unsigned int bufferSize);
-	void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f);
-	void OutputSpectrogram(const audio_sample *psample, unsigned int samples, audio_sample peak, audio_sample delta_f);
-	void OutputOscilloscope(const audio_sample *psample, unsigned int samples, unsigned int samplerate, audio_sample peak);
-	void OutputOscillogram(const audio_sample *psample, unsigned int samples, unsigned int samplerate, audio_sample peak);
+	void OutputSpectrumBars(const audio_sample *psample, unsigned int samples, unsigned int channels, audio_sample peak, audio_sample delta_f);
+	void OutputSpectrogram(const audio_sample *psample, unsigned int samples, unsigned int channels, audio_sample peak, audio_sample delta_f);
+	void OutputOscilloscopeYt(const audio_sample *psample, unsigned int samples, unsigned int samplerate, unsigned int channels, audio_sample peak);
+	void OutputOscilloscopeXy(const audio_sample * psample, unsigned int samples, unsigned int samplerate, unsigned int channels, audio_sample peak);
+	void OutputOscillogram(const audio_sample *psample, unsigned int samples, unsigned int samplerate, unsigned int channels, audio_sample peak);
 
 public:
 	static const unsigned int	rows_min = 1;
@@ -225,69 +227,71 @@ public:
 	static const int			amplitude_min = -100;		// dB
 	static const int			amplitude_max = 10;			// dB
 
-	static const int			gain_oscilloscope_min = 10;			// => * 1.0
-	static const int			gain_oscilloscope_max = 100;		// => * 10.0
+	static const int			gain_oscilloscope_min = 10;		// => * 0.1
+	static const int			gain_oscilloscope_max = 300;	// => * 3.0
+	static const int			gain_oscilloscope_div = 100;	// => / 100
 
-	static const int			offset_oscilloscope_min = -100;		// => -1.0
-	static const int			offset_oscilloscope_max = 100;		// => 1.0
+	static const int			offset_oscilloscope_min = -100;	// => -1.0
+	static const int			offset_oscilloscope_max = 100;	// => 1.0
+	static const int			offset_oscilloscope_div = 100;	// => / 100
 
 	// green > red
-	const unsigned int	spectrumColorTab[3] = { MAKE_COLOR(0, 255, 0), MAKE_COLOR(200, 200, 0), MAKE_COLOR(255, 0, 0) };
+	const unsigned int		spectrumColorTab[3] = { MAKE_COLOR(0, 255, 0), MAKE_COLOR(200, 200, 0), MAKE_COLOR(255, 0, 0) };
 	// black > blue > green > yellow > red
-	const unsigned int	spectrogramColorTab[5] = { MAKE_COLOR(0, 0, 0), MAKE_COLOR(0, 0, 127), MAKE_COLOR(0, 200, 0), MAKE_COLOR(200, 200, 0), MAKE_COLOR(255, 0, 0) };
+	const unsigned int		spectrogramColorTab[5] = { MAKE_COLOR(0, 0, 0), MAKE_COLOR(0, 0, 127), MAKE_COLOR(0, 200, 0), MAKE_COLOR(200, 200, 0), MAKE_COLOR(255, 0, 0) };
 	// black > white
-	const unsigned int	oscilloscopeColorTab[2] = { MAKE_COLOR(0, 0, 0), MAKE_COLOR(255, 255, 255)};
+	const unsigned int		oscilloscopeColorTab[2] = { MAKE_COLOR(0, 0, 0), MAKE_COLOR(255, 255, 255)};
 
 private:
-	unsigned int		rows;
-	unsigned int		columns;
-	unsigned int		ledNo;
+	unsigned int			m_rows;
+	unsigned int			m_columns;
+	unsigned int			m_ledNo;
 
-	unsigned int		brightness;
-	enum led_mode		ledMode;
-	enum line_style		lineStyle;
-	enum led_colors		ledColors;
+	unsigned int			m_brightness;
+	enum led_mode			m_ledMode;
+	enum line_style			m_lineStyle;
+	enum led_colors			m_ledColors;
 
-	bool				logFrequency;
-	bool				logAmplitude;
-	bool				peakValues;
+	bool					m_logFrequency;
+	bool					m_logAmplitude;
+	bool					m_peakValues;
 
-	unsigned int		fftSize;
-	double				audioLength;
+	unsigned int			m_fftSize;
+	double					m_audioLength;
 
-	DWORD				timerStartDelay;
-	DWORD				timerInterval;
+	DWORD					m_timerStartDelay;
+	DWORD					m_timerInterval;
 
-	volatile bool		initDone;
-	volatile bool		timerStarted;
-	volatile bool		timerActive;
+	volatile bool			m_initDone;
+	volatile bool			m_timerStarted;
+	volatile bool			m_timerActive;
 
-	HANDLE				hComm;
-	HANDLE				hTimer;
-	DWORD				commErr;
+	HANDLE					m_hComm;
+	HANDLE					m_hTimer;
+	DWORD					m_commErr;
 
-	unsigned int			comPort;
-	enum ws2812_baudrate	comBaudrate;
+	unsigned int			m_comPort;
+	enum ws2812_baudrate	m_comBaudrate;
 
-	unsigned int		bufferSize;
-	unsigned char		*outputBuffer;			// data to be sent to the arduino
-	unsigned int		*imageBuffer;			// image (xRGB)
-	unsigned int		*persistenceBuffer;		// image persistence (xRGB)
-	unsigned int		*counterBuffer;			// pixel hit count in oscilloscope styles
+	unsigned int			m_bufferSize;
+	unsigned char			*m_outputBuffer;			// data to be sent to the arduino
+	unsigned int			*m_imageBuffer;				// image (xRGB)
+	unsigned int			*m_persistenceBuffer;		// image persistence (xRGB)
+	unsigned int			*m_counterBuffer;			// pixel hit count in oscilloscope styles
 
-	unsigned int		*indexLut;				// led index table (depends on start led and directions)
+	unsigned int			*m_indexLut;				// led index table (depends on start led and directions)
 
-	const unsigned int	colorNo = 1000;
-	unsigned int		*colorTab;				// xRGB
+	const unsigned int		m_colorNo = 1000;
+	unsigned int			*m_colorTab;				// xRGB
 
-	audio_sample		colorsPerRow;
-	audio_sample		colorsPerCol;
+	audio_sample			m_colorsPerRow;
+	audio_sample			m_colorsPerCol;
 
-	int					freqMin[ws2812_line_style_no];
-	int					freqMax[ws2812_line_style_no];
+	int						m_freqMin[ws2812_line_style_no];
+	int						m_freqMax[ws2812_line_style_no];
 
-	int					amplMin[ws2812_line_style_no];
-	int					amplMax[ws2812_line_style_no];
+	int						m_amplMin[ws2812_line_style_no];
+	int						m_amplMax[ws2812_line_style_no];
 
 	service_ptr_t<visualisation_stream_v3>	visStream;
 };

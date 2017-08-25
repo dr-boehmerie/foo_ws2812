@@ -155,7 +155,7 @@ LPCTSTR		cfg_ledColorsStr[ws2812_led_colors_no] = { L"GRB", L"BRG", L"RGB" };
 LRESULT		cfg_ledColorsId[ws2812_led_colors_no];
 
 // TODO number of entries should depend on enum line_style
-LPCTSTR		cfg_lineStyleStr[ws2812_line_style_no] = { L"Simple", L"Bars", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe", L"Oscillogram (hori)", L"Oscillogram (vert)" };
+LPCTSTR		cfg_lineStyleStr[ws2812_line_style_no] = { L"Simple", L"Bars", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe (Yt)", L"Oscilloscpe (XY)", L"Oscillogram (hori)", L"Oscillogram (vert)" };
 LRESULT		cfg_lineStyleId[ws2812_line_style_no];
 
 // TODO number of entries should depend on enum ws2812_baudrate
@@ -534,7 +534,8 @@ void CWS2812Preferences::apply() {
 	case ws2812_spectrum_fire_lines:		colors = GetCfgSpectrumFireColors();	break;
 	case ws2812_spectrogram_horizontal:		colors = GetCfgSpectrogramColors();		break;
 	case ws2812_spectrogram_vertical:		colors = GetCfgSpectrogramColors();		break;
-	case ws2812_oscilloscope:				colors = GetCfgOscilloscopeColors();	break;
+	case ws2812_oscilloscope_yt:			colors = GetCfgOscilloscopeColors();	break;
+	case ws2812_oscilloscope_xy:			colors = GetCfgOscilloscopeColors();	break;
 	case ws2812_oscillogram_horizontal:		colors = GetCfgOscilloscopeColors();	break;
 	case ws2812_oscillogram_vertical:		colors = GetCfgOscilloscopeColors();	break;
 	}

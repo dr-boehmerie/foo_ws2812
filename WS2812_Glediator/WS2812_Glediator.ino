@@ -36,7 +36,7 @@
 //##############################################################################
 
 #define USE_SERIAL_LIB     1
-#define USE_TM1829         1
+#define USE_TM1829         0
 
 // Arduino Micro D5: PC6
 #define DATA_PORT          PORTC
