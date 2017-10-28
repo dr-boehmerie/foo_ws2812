@@ -151,11 +151,11 @@ LPCTSTR		cfg_ledDirStr[ws2812_led_dir_no] = { L"Common", L"Alternating" };
 LRESULT		cfg_ledDirId[ws2812_led_dir_no];
 
 // TODO number of entries should depend on enum led_colors
-LPCTSTR		cfg_ledColorsStr[ws2812_led_colors_no] = { L"GRB", L"BRG", L"RGB" };
+LPCTSTR		cfg_ledColorsStr[ws2812_led_colors_no] = { L"GRB", L"BRG", L"RGB", L"GRBW", L"RGBW" };
 LRESULT		cfg_ledColorsId[ws2812_led_colors_no];
 
 // TODO number of entries should depend on enum line_style
-LPCTSTR		cfg_lineStyleStr[ws2812_line_style_no] = { L"Simple", L"Bars", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe (Yt)", L"Oscilloscpe (XY)", L"Oscillogram (hori)", L"Oscillogram (vert)" };
+LPCTSTR		cfg_lineStyleStr[ws2812_line_style_no] = { L"Simple", L"Bars", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe (Yt)", L"Oscilloscpe (XY)", L"Oscillogram (hori)", L"Oscillogram (vert)", L"LED Test" };
 LRESULT		cfg_lineStyleId[ws2812_line_style_no];
 
 // TODO number of entries should depend on enum ws2812_baudrate
@@ -529,6 +529,7 @@ void CWS2812Preferences::apply() {
 	const char *colors = NULL;
 	switch (cfg_lineStyle)
 	{
+	default:
 	case ws2812_spectrum_simple:			colors = GetCfgSpectrumColors();		break;
 	case ws2812_spectrum_green_red_bars:	colors = GetCfgSpectrumBarColors();		break;
 	case ws2812_spectrum_fire_lines:		colors = GetCfgSpectrumFireColors();	break;

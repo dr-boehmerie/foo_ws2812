@@ -224,6 +224,7 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 	//int pos = pScrollbar->GetScrollPos();
 
 	WCHAR	text[100];
+	bool	ledTest = GetLedTestMode();
 
 	// 0 <= nPos <= 100
 	if (hwnd == m_slider_brightness) {
@@ -258,59 +259,91 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 	}
 	else if (hwnd == m_slider_freq_min) {
 		int val = m_slider_freq_min.GetPos();
-		_stprintf_s(text, L"%s: %i Hz", m_text_freq_min, val);
-		SetDlgItemText(IDC_TXT_FREQ_MIN, text);
 
-		SetFrequencyMinMax(val, INT_MAX);
+		if (ledTest) {
+			_stprintf_s(text, L"Red: %i", val);
+			SetDlgItemText(IDC_TXT_FREQ_MIN, text);
 
-		if (nSBCode != TB_THUMBTRACK)
-			SaveFrequencyMinMax();
+			SetLedTestVal(0, val);
+		}
+		else {
+			_stprintf_s(text, L"%s: %i Hz", m_text_freq_min, val);
+			SetDlgItemText(IDC_TXT_FREQ_MIN, text);
+
+			SetFrequencyMinMax(val, INT_MAX);
+
+			if (nSBCode != TB_THUMBTRACK)
+				SaveFrequencyMinMax();
+		}
 	}
 	else if (hwnd == m_slider_freq_max) {
 		int val = m_slider_freq_max.GetPos();
-		_stprintf_s(text, L"%s: %i Hz", m_text_freq_max, val);
-		SetDlgItemText(IDC_TXT_FREQ_MAX, text);
 
-		SetFrequencyMinMax(INT_MIN, val);
+		if (ledTest) {
+			_stprintf_s(text, L"Green: %i", val);
+			SetDlgItemText(IDC_TXT_FREQ_MAX, text);
 
-		if (nSBCode != TB_THUMBTRACK)
-			SaveFrequencyMinMax();
+			SetLedTestVal(1, val);
+		}
+		else {
+			_stprintf_s(text, L"%s: %i Hz", m_text_freq_max, val);
+			SetDlgItemText(IDC_TXT_FREQ_MAX, text);
+
+			SetFrequencyMinMax(INT_MIN, val);
+
+			if (nSBCode != TB_THUMBTRACK)
+				SaveFrequencyMinMax();
+		}
 	}
 	else if (hwnd == m_slider_ampl_min) {
 		int val = m_slider_ampl_min.GetPos();
 
-		if (GetMinAmplitudeIsOffset()) {
-			// this value is used as offset
-			_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)val / (double)ws2812::offset_oscilloscope_div);
+		if (ledTest) {
+			_stprintf_s(text, L"Blue: %i", val);
+			SetDlgItemText(IDC_TXT_AMPL_MIN, text);
+
+			SetLedTestVal(2, val);
 		}
 		else {
-			_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, val);
+			if (GetMinAmplitudeIsOffset()) {
+				// this value is used as offset
+				_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)val / (double)ws2812::offset_oscilloscope_div);
+			}
+			else {
+				_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, val);
+			}
+			SetDlgItemText(IDC_TXT_AMPL_MIN, text);
+
+			SetAmplitudeMinMax(val, INT_MAX);
+
+			if (nSBCode != TB_THUMBTRACK)
+				SaveAmplitudeMinMax();
 		}
-
-		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
-
-		SetAmplitudeMinMax(val, INT_MAX);
-
-		if (nSBCode != TB_THUMBTRACK)
-			SaveAmplitudeMinMax();
 	}
 	else if (hwnd == m_slider_ampl_max) {
 		int val = m_slider_ampl_max.GetPos();
 
-		if (GetMaxAmplitudeIsGain()) {
-			// this value is used as gain
-			_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)val / (double)ws2812::gain_oscilloscope_div);
+		if (ledTest) {
+			_stprintf_s(text, L"White: %i", val);
+			SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+
+			SetLedTestVal(3, val);
 		}
 		else {
-			_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, val);
+			if (GetMaxAmplitudeIsGain()) {
+				// this value is used as gain
+				_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)val / (double)ws2812::gain_oscilloscope_div);
+			}
+			else {
+				_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, val);
+			}
+			SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+
+			SetAmplitudeMinMax(INT_MIN, val);
+
+			if (nSBCode != TB_THUMBTRACK)
+				SaveAmplitudeMinMax();
 		}
-
-		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
-
-		SetAmplitudeMinMax(INT_MIN, val);
-
-		if (nSBCode != TB_THUMBTRACK)
-			SaveAmplitudeMinMax();
 	}
 
 	if (nSBCode == TB_ENDTRACK) {
@@ -348,71 +381,104 @@ void CWS2812ControlDialog::UpdateFrequencyAmplitudeSlider(void)
 	WCHAR text[100];
 	int fmin = 0, fmax = 0;
 	int amin = 0, amax = 0;
-	unsigned int style = 0;
 
-	GetLineStyle(&style);
+	if (GetLedTestMode()) {
+		int min = 0;
+		int max = 255;
+		int val = 0;
 
-	// frequency and amplitude scaling
-	GetFrequencyMinMax(&fmin, &fmax);
+		m_slider_freq_min.SetRange(min, max, TRUE);
+		m_slider_freq_min.SetTicFreq((max - min) / 10);
+		m_slider_freq_min.SetPos(val);
 
-	m_slider_freq_min.SetRange(ws2812::frequency_min, ws2812::frequency_max, TRUE);
-	m_slider_freq_min.SetTicFreq((ws2812::frequency_max - ws2812::frequency_min) / 10);
-	m_slider_freq_min.SetPos(fmin);
+		m_slider_freq_max.SetRange(min, max, TRUE);
+		m_slider_freq_max.SetTicFreq((max - min) / 10);
+		m_slider_freq_max.SetPos(val);
 
-	_stprintf_s(text, L"%s: %u Hz", m_text_freq_min, fmin);
-	SetDlgItemText(IDC_TXT_FREQ_MIN, text);
+		m_slider_ampl_min.SetRange(min, max, TRUE);
+		m_slider_ampl_min.SetTicFreq((max - min) / 10);
+		m_slider_ampl_min.SetPos(val);
 
-	m_slider_freq_max.SetRange(ws2812::frequency_min, ws2812::frequency_max, TRUE);
-	m_slider_freq_max.SetTicFreq((ws2812::frequency_max - ws2812::frequency_min) / 10);
-	m_slider_freq_max.SetPos(fmax);
+		m_slider_ampl_max.SetRange(min, max, TRUE);
+		m_slider_ampl_max.SetTicFreq((max - min) / 10);
+		m_slider_ampl_max.SetPos(val);
 
-	_stprintf_s(text, L"%s: %u Hz", m_text_freq_max, fmax);
-	SetDlgItemText(IDC_TXT_FREQ_MAX, text);
+		_stprintf_s(text, L"Red: %i", val);
+		SetDlgItemText(IDC_TXT_FREQ_MIN, text);
 
-	GetAmplitudeMinMax(&amin, &amax);
+		_stprintf_s(text, L"Green: %i", val);
+		SetDlgItemText(IDC_TXT_FREQ_MAX, text);
 
-	if (GetMinAmplitudeIsOffset()) {
-		// Oscilloscope: offset: -100 ... 100 -> -1.0 ... 1.0
-		m_slider_ampl_min.SetRange(ws2812::offset_oscilloscope_min, ws2812::offset_oscilloscope_max, TRUE);
-		m_slider_ampl_min.SetTicFreq((ws2812::offset_oscilloscope_max - ws2812::offset_oscilloscope_min) / 10);
-		m_slider_ampl_min.SetPos(amin);
-
-		_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)amin / (double)ws2812::offset_oscilloscope_div);
+		_stprintf_s(text, L"Blue: %i", val);
 		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
+
+		_stprintf_s(text, L"White: %i", val);
+		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
 	}
 	else {
-		m_slider_ampl_min.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
-		m_slider_ampl_min.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
-		m_slider_ampl_min.SetPos(amin);
 
-		_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, amin);
-		SetDlgItemText(IDC_TXT_AMPL_MIN, text);
-	}
+		// frequency and amplitude scaling
+		GetFrequencyMinMax(&fmin, &fmax);
 
-	if (GetMaxAmplitudeIsGain()) {
-		// gain: 1 ... 100 -> 0.1 ... 10.0
-		m_slider_ampl_max.SetRange(ws2812::gain_oscilloscope_min, ws2812::gain_oscilloscope_max, TRUE);
-		m_slider_ampl_max.SetTicFreq((ws2812::gain_oscilloscope_max - ws2812::gain_oscilloscope_min) / 10);
-		m_slider_ampl_max.SetPos(amax);
+		m_slider_freq_min.SetRange(ws2812::frequency_min, ws2812::frequency_max, TRUE);
+		m_slider_freq_min.SetTicFreq((ws2812::frequency_max - ws2812::frequency_min) / 10);
+		m_slider_freq_min.SetPos(fmin);
 
-		_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)amax / (double)ws2812::gain_oscilloscope_div);
-		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+		_stprintf_s(text, L"%s: %u Hz", m_text_freq_min, fmin);
+		SetDlgItemText(IDC_TXT_FREQ_MIN, text);
 
-		// frequency limits not applicable
-		m_slider_freq_min.EnableWindow(false);
-		m_slider_freq_max.EnableWindow(false);
-	}
-	else {
-		m_slider_ampl_max.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
-		m_slider_ampl_max.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
-		m_slider_ampl_max.SetPos(amax);
+		m_slider_freq_max.SetRange(ws2812::frequency_min, ws2812::frequency_max, TRUE);
+		m_slider_freq_max.SetTicFreq((ws2812::frequency_max - ws2812::frequency_min) / 10);
+		m_slider_freq_max.SetPos(fmax);
 
-		_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, amax);
-		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+		_stprintf_s(text, L"%s: %u Hz", m_text_freq_max, fmax);
+		SetDlgItemText(IDC_TXT_FREQ_MAX, text);
 
-		// frequency limits enabled
-		m_slider_freq_min.EnableWindow(true);
-		m_slider_freq_max.EnableWindow(true);
+		GetAmplitudeMinMax(&amin, &amax);
+
+		if (GetMinAmplitudeIsOffset()) {
+			// Oscilloscope: offset: -100 ... 100 -> -1.0 ... 1.0
+			m_slider_ampl_min.SetRange(ws2812::offset_oscilloscope_min, ws2812::offset_oscilloscope_max, TRUE);
+			m_slider_ampl_min.SetTicFreq((ws2812::offset_oscilloscope_max - ws2812::offset_oscilloscope_min) / 10);
+			m_slider_ampl_min.SetPos(amin);
+
+			_stprintf_s(text, L"%s: %.2f", m_text_offset, (double)amin / (double)ws2812::offset_oscilloscope_div);
+			SetDlgItemText(IDC_TXT_AMPL_MIN, text);
+		}
+		else {
+			m_slider_ampl_min.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
+			m_slider_ampl_min.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
+			m_slider_ampl_min.SetPos(amin);
+
+			_stprintf_s(text, L"%s: %i dB", m_text_ampl_min, amin);
+			SetDlgItemText(IDC_TXT_AMPL_MIN, text);
+		}
+
+		if (GetMaxAmplitudeIsGain()) {
+			// gain: 1 ... 100 -> 0.1 ... 10.0
+			m_slider_ampl_max.SetRange(ws2812::gain_oscilloscope_min, ws2812::gain_oscilloscope_max, TRUE);
+			m_slider_ampl_max.SetTicFreq((ws2812::gain_oscilloscope_max - ws2812::gain_oscilloscope_min) / 10);
+			m_slider_ampl_max.SetPos(amax);
+
+			_stprintf_s(text, L"%s: %.2f", m_text_gain, (double)amax / (double)ws2812::gain_oscilloscope_div);
+			SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+
+			// frequency limits not applicable
+			m_slider_freq_min.EnableWindow(false);
+			m_slider_freq_max.EnableWindow(false);
+		}
+		else {
+			m_slider_ampl_max.SetRange(ws2812::amplitude_min, ws2812::amplitude_max, TRUE);
+			m_slider_ampl_max.SetTicFreq((ws2812::amplitude_max - ws2812::amplitude_min) / 10);
+			m_slider_ampl_max.SetPos(amax);
+
+			_stprintf_s(text, L"%s: %i dB", m_text_ampl_max, amax);
+			SetDlgItemText(IDC_TXT_AMPL_MAX, text);
+
+			// frequency limits enabled
+			m_slider_freq_min.EnableWindow(true);
+			m_slider_freq_max.EnableWindow(true);
+		}
 	}
 }
 
@@ -447,6 +513,7 @@ void CWS2812ControlDialog::OnStyleClicked(UINT code, int id, CWindow hwnd)
 			// init color tab
 			switch (style)
 			{
+			default:
 			case ws2812_spectrum_simple:			colors = GetCfgSpectrumColors();		break;
 			case ws2812_spectrum_green_red_bars:	colors = GetCfgSpectrumBarColors();		break;
 			case ws2812_spectrum_fire_lines:		colors = GetCfgSpectrumFireColors();	break;

@@ -35,21 +35,42 @@
 //                                                                             #
 //##############################################################################
 
-#define USE_SERIAL_LIB     1
-#define USE_TM1829         0
+#define USE_SERIAL_LIB      1
+#define USE_TM1829          0
+#define USE_DUAL_STRIPES    1
 
 // Arduino Micro D5: PC6
 #define DATA_PORT          PORTC
 #define DATA_DDR           DDRC
 #define DATA_PIN           6
 
+#if USE_DUAL_STRIPES
+// Arduino Micro D6: PD7
+#define DATA2_PORT         PORTD
+#define DATA2_DDR          DDRD
+#define DATA2_PIN          7
+#endif
+
 #if USE_TM1829
 // Renkforce TM1829 5m Digital LED Stripe
 #define NUMBER_OF_PIXELS   50
+
+// number of bytes per pixel (3 for BRG, 4 for RGBW)
+#define BYTE_PER_PIXEL     3
+
 #else
 // WS2812 5m LED Stripe
-#define NUMBER_OF_PIXELS   240
+#if USE_DUAL_STRIPES
+#define NUMBER_OF_PIXELS   600
+#else
+#define NUMBER_OF_PIXELS   300
 #endif
+
+// number of bytes per pixel (3 for BRG, 4 for RGBW)
+#define BYTE_PER_PIXEL     3
+
+#endif
+
 
 // Arduino Micro LED IO13: PC7
 // indicates active output
@@ -63,7 +84,7 @@
 //                                                                             #
 //##############################################################################
 
-uint8_t display_buffer[NUMBER_OF_PIXELS * 3];
+uint8_t display_buffer[NUMBER_OF_PIXELS * BYTE_PER_PIXEL];
 static uint8_t *ptr = display_buffer;
 static uint16_t pos = 0;
 
@@ -81,22 +102,28 @@ volatile uint8_t go = 0;
 void setup()
 {
   // Set data pin as output
-  DATA_DDR |= (1 << DATA_PIN);
+  DATA_DDR |= _BV(DATA_PIN);
+#if USE_DUAL_STRIPES
+  DATA2_DDR |= _BV(DATA2_PIN);
+#endif
 
 #if defined LED_PIN
   // Set LED pin as output
-  LED_DDR |= (1 << LED_PIN);
+  LED_DDR |= _BV(LED_PIN);
 #endif
 
   // clear LEDs
   cli();
 #if USE_TM1829
   // Reset pulse => output high for typ. 500us
-  DATA_PORT |= (1 << DATA_PIN);
+  DATA_PORT |= _BV(DATA_PIN);
+#if USE_DUAL_STRIPES
+  DATA2_PORT |= _BV(DATA2_PIN);
+#endif  
   _delay_us(500);
-  tm1829_sendarray(display_buffer, NUMBER_OF_PIXELS * 3);
+  tm1829_sendarray(display_buffer, NUMBER_OF_PIXELS * BYTE_PER_PIXEL);
 #else
-  ws2812_sendarray(display_buffer, NUMBER_OF_PIXELS * 3);
+  ws2812_sendarray(display_buffer, NUMBER_OF_PIXELS * BYTE_PER_PIXEL);
 #endif
   sei();
   
@@ -133,11 +160,11 @@ void loop()
       ptr = display_buffer;
     } else {
 	    // RGB bytes, must not contain the value 1, for this is used as the start of frame signal!
-      if (pos < (NUMBER_OF_PIXELS * 3)) {
+      if (pos < (NUMBER_OF_PIXELS * BYTE_PER_PIXEL)) {
         *ptr++ = b;
         pos++;
       }
-      if (pos == (NUMBER_OF_PIXELS * 3)) {
+      if (pos == (NUMBER_OF_PIXELS * BYTE_PER_PIXEL)) {
         pos++;
         go = 1;
       }
@@ -147,20 +174,20 @@ void loop()
 
   if (go != 0) {
 #if defined LED_PIN
-    LED_PORT |= (1 << LED_PIN);
+    LED_PORT |= _BV(LED_PIN);
 #endif
 
     cli();
 #if USE_TM1829
-    tm1829_sendarray(display_buffer, NUMBER_OF_PIXELS * 3);
+    tm1829_sendarray(display_buffer, NUMBER_OF_PIXELS * BYTE_PER_PIXEL);
 #else
-    ws2812_sendarray(display_buffer, NUMBER_OF_PIXELS * 3);
+    ws2812_sendarray(display_buffer, NUMBER_OF_PIXELS * BYTE_PER_PIXEL);
 #endif
     sei();
     go = 0;
     
 #if defined LED_PIN
-    LED_PORT &= ~(1 << LED_PIN);
+    LED_PORT &= ~_BV(LED_PIN);
 #endif
   }
 }
@@ -177,9 +204,25 @@ ISR(USART_RX_vect)
   unsigned char b;
   b=UDR0;
   
-  if (b == 1)  {pos=0; ptr=display_buffer; return;}    
-  if (pos == (NUMBER_OF_PIXELS*3)) {} else {*ptr=b; ptr++; pos++;}  
-  if (pos == ((NUMBER_OF_PIXELS*3)-1)) {go=1;}
+  if (b == 1)
+  {
+    pos = 0;
+    ptr = display_buffer;
+    return;
+  }
+  if (pos == (NUMBER_OF_PIXELS * BYTE_PER_PIXEL))
+  {
+  }
+  else
+  {
+    *ptr = b;
+    ptr++;
+    pos++;
+  }
+  if (pos == ((NUMBER_OF_PIXELS * BYTE_PER_PIXEL) - 1))
+  {
+    go = 1;
+  }
 }
 #endif  // !USE_SERIAL_LIB
 
@@ -192,14 +235,22 @@ ISR(USART_RX_vect)
 //                                                                             #
 //##############################################################################
 
-void ws2812_sendarray(uint8_t *data,uint16_t datlen)
+void ws2812_sendarray(uint8_t *data, uint16_t dataLen)
 {
-  uint8_t curbyte,ctr,masklo;
+  uint8_t curbyte, ctr;
   uint8_t maskhi = _BV(DATA_PIN);
-  masklo =~ maskhi & DATA_PORT;
+  uint8_t masklo =~ maskhi & DATA_PORT;
   maskhi |= DATA_PORT;
 
-  while (datlen--) 
+#if USE_DUAL_STRIPES
+  dataLen >>= 1;
+  
+  uint16_t  len = dataLen;
+
+  while (len--) 
+#else
+  while (dataLen--) 
+#endif
   {
     curbyte = *data++;
 
@@ -229,6 +280,41 @@ void ws2812_sendarray(uint8_t *data,uint16_t datlen)
     );
   }
 
+#if USE_DUAL_STRIPES
+  maskhi = _BV(DATA2_PIN);
+  masklo =~ maskhi & DATA2_PORT;
+  maskhi |= DATA2_PORT;
+
+  while (dataLen--) 
+  {
+    curbyte = *data++;
+
+    // 1CK = 62.5ns
+    // 0 = 375n (6CK)  H, 875n (14CK) L
+    // 1 = 625n (10CK) H, 625n (10CK) L
+    asm volatile
+    (
+      "    ldi %0,8  \n\t"   // 0
+      "loop%=:out %2, %3  \n\t"   // 1
+      "lsl  %1    \n\t"   // 2
+      "dec  %0    \n\t"   // 3
+      "   rjmp .+0  \n\t"   // 5
+      "   brcs .+2  \n\t"   // 6l / 7h
+      "   out %2,%4 \n\t"   // 7l / -
+      "   rjmp .+0  \n\t"   // 9
+      "   nop   \n\t"   // 10
+      "   out %2,%4 \n\t"   // 11
+      "   breq end%=  \n\t"   // 12      nt. 13 taken
+      "   rjmp .+0  \n\t"   // 14
+      "   rjmp .+0  \n\t"   // 16
+      "   rjmp .+0  \n\t"   // 18
+      "   rjmp loop%= \n\t"   // 20
+      "end%=:     \n\t" 
+      : "=&d" (ctr)
+      : "r" (curbyte), "I" (_SFR_IO_ADDR(DATA2_PORT)), "r" (maskhi), "r" (masklo)
+    );
+  }
+#endif
 }
 
 
@@ -240,7 +326,7 @@ void ws2812_sendarray(uint8_t *data,uint16_t datlen)
 //                                                                             #
 //##############################################################################
 
-void tm1829_sendarray(uint8_t *data, uint16_t datlen)
+void tm1829_sendarray(uint8_t *data, uint16_t dataLen)
 {
   uint8_t curbyte, ctr;
   uint8_t maskhi, masklo;
@@ -250,7 +336,7 @@ void tm1829_sendarray(uint8_t *data, uint16_t datlen)
 
   // output pin is idle high
   
-  while (datlen--)      // ?CK
+  while (dataLen--)      // ?CK
   {
     curbyte = *data++;  // ?CK
     

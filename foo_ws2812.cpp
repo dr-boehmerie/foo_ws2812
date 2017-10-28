@@ -620,6 +620,15 @@ void ws2812::ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned 
 	b = (b * brightness) / 100;
 }
 
+void ws2812::ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned int &g, unsigned int &b, unsigned int &w)
+{
+	// brightness 0...100
+	r = (r * brightness) / 100;
+	g = (g * brightness) / 100;
+	b = (b * brightness) / 100;
+	w = (w * brightness) / 100;
+}
+
 void ws2812::ColorsToImage(unsigned int led_index, unsigned int r, unsigned int g, unsigned int b)
 {
 	unsigned int	color = MAKE_COLOR(r, g, b);
@@ -633,11 +642,19 @@ void ws2812::ColorsToImage(unsigned int led_index, unsigned int r, unsigned int 
 void ws2812::ImageToBuffer(unsigned char *buffer, unsigned int bufferSize)
 {
 	unsigned int	i;
+	unsigned int	incr;
 	unsigned int	r, g, b;
-	unsigned int	r_i, g_i, b_i;
+	unsigned int	r_i, g_i, b_i, w_i = 0;
 	unsigned int	count;
+	unsigned int	bright = m_brightness;
 
-	count = bufferSize / 3;
+	if (m_ledColors > ws2812_led_colors_rgb) {
+		incr = 4;
+	}
+	else {
+		incr = 3;
+	}
+	count = bufferSize / incr;
 	if (count > m_ledNo)
 		count = m_ledNo;
 
@@ -661,6 +678,20 @@ void ws2812::ImageToBuffer(unsigned char *buffer, unsigned int bufferSize)
 		g_i = 1;
 		b_i = 2;
 		break;
+
+	case ws2812_led_colors_grbw:
+		r_i = 1;
+		g_i = 0;
+		b_i = 2;
+		w_i = 3;
+		break;
+
+	case ws2812_led_colors_rgbw:
+		r_i = 0;
+		g_i = 1;
+		b_i = 2;
+		w_i = 3;
+		break;
 	}
 
 	if (buffer && m_imageBuffer) {
@@ -670,6 +701,8 @@ void ws2812::ImageToBuffer(unsigned char *buffer, unsigned int bufferSize)
 			g = GET_COLOR_G(m_imageBuffer[i]);
 			b = GET_COLOR_B(m_imageBuffer[i]);
 
+			ApplyBrightness(bright, r, g, b);
+
 			// all values < 2 are replaced by 0 (1 is reserved for start of block)
 			// and clip to 250 max brightness
 			if (r < 2) r = 0; else if (r > 250) r = 250;
@@ -677,18 +710,107 @@ void ws2812::ImageToBuffer(unsigned char *buffer, unsigned int bufferSize)
 			if (b < 2) b = 0; else if (b > 250) b = 250;
 
 			// write colors to buffer
-			// color ouput order for Renkforce is BRG
-			buffer[3 * i + r_i] = (unsigned char)r;
-			buffer[3 * i + g_i] = (unsigned char)g;
-			buffer[3 * i + b_i] = (unsigned char)b;
+			buffer[incr * i + r_i] = (unsigned char)r;
+			buffer[incr * i + g_i] = (unsigned char)g;
+			buffer[incr * i + b_i] = (unsigned char)b;
+		}
+	}
+}
+
+void ws2812::LedTestToBuffer(unsigned char *buffer, unsigned int bufferSize)
+{
+	unsigned int	i;
+	unsigned int	incr;
+	unsigned int	r, g, b, w = 0;
+	unsigned int	r_i, g_i, b_i, w_i = 0;
+	unsigned int	count;
+
+	if (m_ledColors > ws2812_led_colors_rgb) {
+		incr = 4;
+	}
+	else {
+		incr = 3;
+	}
+	count = bufferSize / incr;
+	if (count > m_ledNo)
+		count = m_ledNo;
+
+	switch (m_ledColors)
+	{
+	default:
+	case ws2812_led_colors_grb:
+		r_i = 1;
+		g_i = 0;
+		b_i = 2;
+		break;
+
+	case ws2812_led_colors_brg:
+		r_i = 1;
+		g_i = 2;
+		b_i = 0;
+		break;
+
+	case ws2812_led_colors_rgb:
+		r_i = 0;
+		g_i = 1;
+		b_i = 2;
+		break;
+
+	case ws2812_led_colors_grbw:
+		r_i = 1;
+		g_i = 0;
+		b_i = 2;
+		w_i = 3;
+		break;
+
+	case ws2812_led_colors_rgbw:
+		r_i = 0;
+		g_i = 1;
+		b_i = 2;
+		w_i = 3;
+		break;
+	}
+
+	if (buffer) {
+		// get WRGB
+		r = GET_COLOR_R(m_testColor);
+		g = GET_COLOR_G(m_testColor);
+		b = GET_COLOR_B(m_testColor);
+		w = GET_COLOR_W(m_testColor);
+
+		ApplyBrightness(m_brightness, r, g, b, w);
+
+		// all values < 2 are replaced by 0 (1 is reserved for start of block)
+		// and clip to 250 max brightness
+		if (r < 2) r = 0; else if (r > 250) r = 250;
+		if (g < 2) g = 0; else if (g > 250) g = 250;
+		if (b < 2) b = 0; else if (b > 250) b = 250;
+		if (w < 2) w = 0; else if (w > 250) w = 250;
+
+		if (incr == 4) {
+			for (i = 0; i < count; i++) {
+				// write colors to buffer
+				buffer[incr * i + r_i] = (unsigned char)r;
+				buffer[incr * i + g_i] = (unsigned char)g;
+				buffer[incr * i + b_i] = (unsigned char)b;
+				buffer[incr * i + w_i] = (unsigned char)w;
+			}
+		}
+		else {
+			for (i = 0; i < count; i++) {
+				// write colors to buffer
+				buffer[incr * i + r_i] = (unsigned char)r;
+				buffer[incr * i + g_i] = (unsigned char)g;
+				buffer[incr * i + b_i] = (unsigned char)b;
+			}
 		}
 	}
 }
 
 void ws2812::ImageScrollLeft(void)
 {
-	unsigned int	rows = this->m_rows;
-	unsigned int	cols = this->m_columns;
+	unsigned int	rows = m_rows;
+	unsigned int	cols = m_columns;
 	unsigned int	row, col;
 
 	if (cols > 1 && rows > 0) {
@@ -709,8 +831,8 @@ void ws2812::ImageScrollLeft(void)
 
 void ws2812::ImageScrollRight(void)
 {
-	unsigned int	rows = this->m_rows;
-	unsigned int	cols = this->m_columns;
+	unsigned int	rows = m_rows;
+	unsigned int	cols = m_columns;
 	unsigned int	row, col;
 
 	if (cols > 1 && rows > 0) {
@@ -731,8 +853,8 @@ void ws2812::ImageScrollRight(void)
 
 void ws2812::ImageScrollUp(void)
 {
-	unsigned int	rows = this->m_rows;
-	unsigned int	cols = this->m_columns;
+	unsigned int	rows = m_rows;
+	unsigned int	cols = m_columns;
 	unsigned int	row, col;
 
 	if (cols > 0 && rows > 1) {
@@ -753,8 +875,8 @@ void ws2812::ImageScrollUp(void)
 
 void ws2812::ImageScrollDown(void)
 {
-	unsigned int	rows = this->m_rows;
-	unsigned int	cols = this->m_columns;
+	unsigned int	rows = m_rows;
+	unsigned int	cols = m_columns;
 	unsigned int	row, col;
 
 	if (cols > 0 && rows > 1) {
@@ -776,13 +898,12 @@ void ws2812::ImageScrollDown(void)
 
 void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int samples, unsigned int channels, audio_sample peak, audio_sample delta_f)
 {
-	unsigned int	rows = this->m_rows;
-	unsigned int	cols = this->m_columns;
-	unsigned int	bright = this->m_brightness;
-	enum line_style	line_style = this->m_lineStyle;
-	bool			log_a = this->m_logAmplitude;
-	bool			log_f = this->m_logFrequency;
-	bool			peaks = this->m_peakValues;
+	unsigned int	rows = m_rows;
+	unsigned int	cols = m_columns;
+	enum line_style	line_style = m_lineStyle;
+	bool			log_a = m_logAmplitude;
+	bool			log_f = m_logFrequency;
+	bool			peaks = m_peakValues;
 
 	unsigned int	bar, cnt, row;
 	unsigned int	bar_cnt;
@@ -805,8 +926,8 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 	bar_cnt = cols;
 
 	// limits
-	db_max = (audio_sample)this->m_amplMax[this->m_lineStyle];
-	db_min = (audio_sample)this->m_amplMin[this->m_lineStyle];
+	db_max = (audio_sample)m_amplMax[m_lineStyle];
+	db_min = (audio_sample)m_amplMin[m_lineStyle];
 
 	if (db_max <= db_min) {
 		// invalid values
@@ -835,17 +956,17 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 	sample_max = samples;
 
 	// user limits
-	if (this->m_freqMin[this->m_lineStyle] > frequency_min) {
+	if (m_freqMin[m_lineStyle] > frequency_min) {
 		f_limit = true;
 
-		f_min = (double)this->m_freqMin[this->m_lineStyle];
+		f_min = (double)this->m_freqMin[m_lineStyle];
 		sample_min = (unsigned int)floor(f_min / (double)delta_f);
 	}
 
-	if (this->m_freqMax[this->m_lineStyle] < frequency_max) {
+	if (m_freqMax[m_lineStyle] < frequency_max) {
 		f_limit = true;
 
-		f_max = (double)this->m_freqMax[this->m_lineStyle];
+		f_max = (double)m_freqMax[m_lineStyle];
 		sample_max = (unsigned int)ceil(f_max / (double)delta_f);
 	}
 
@@ -1039,8 +1160,6 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 
 				AddPersistenceSpectrum(led_index, r, g, b);
 
-				ApplyBrightness(bright, r, g, b);
-
 				ColorsToImage(led_index, r, g, b);
 			}
 			break;
@@ -1054,8 +1173,6 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 				led_index = LedIndex(rows - row, bar);
 
 				AddPersistenceSpectrum(led_index, r, g, b);
-
-				ApplyBrightness(bright, r, g, b);
 
 				ColorsToImage(led_index, r, g, b);
 			}
@@ -1071,8 +1188,6 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 
 				AddPersistenceSpectrum(led_index, r, g, b);
 
-				ApplyBrightness(bright, r, g, b);
-
 				ColorsToImage(led_index, r, g, b);
 			}
 			break;
@@ -1084,12 +1199,11 @@ void ws2812::OutputSpectrumBars(const audio_sample *psample, unsigned int sample
 
 void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples, unsigned int channels, audio_sample peak, audio_sample delta_f)
 {
-	unsigned int	rows = this->m_rows;
-	unsigned int	cols = this->m_columns;
-	unsigned int	bright = this->m_brightness;
-	bool			log_a = this->m_logAmplitude;
-	bool			log_f = this->m_logFrequency;
-	bool			peaks = this->m_peakValues;
+	unsigned int	rows = m_rows;
+	unsigned int	cols = m_columns;
+	bool			log_a = m_logAmplitude;
+	bool			log_f = m_logFrequency;
+	bool			peaks = m_peakValues;
 
 	unsigned int	bar, cnt, row, col;
 	unsigned int	bar_cnt;
@@ -1119,8 +1233,8 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 	}
 
 	// limits
-	db_max = (audio_sample)this->m_amplMax[this->m_lineStyle];
-	db_min = (audio_sample)this->m_amplMin[this->m_lineStyle];
+	db_max = (audio_sample)m_amplMax[m_lineStyle];
+	db_min = (audio_sample)m_amplMin[m_lineStyle];
 
 	if (db_max <= db_min) {
 		// invalid values
@@ -1137,17 +1251,17 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 	sample_max = samples;
 
 	// user limits
-	if (this->m_freqMin[this->m_lineStyle] > frequency_min) {
+	if (m_freqMin[m_lineStyle] > frequency_min) {
 		f_limit = true;
 
-		f_min = (double)this->m_freqMin[this->m_lineStyle];
+		f_min = (double)m_freqMin[m_lineStyle];
 		sample_min = (unsigned int)floor(f_min / (double)delta_f);
 	}
 
-	if (this->m_freqMax[this->m_lineStyle] < frequency_max) {
+	if (m_freqMax[this->m_lineStyle] < frequency_max) {
 		f_limit = true;
 
-		f_max = (double)this->m_freqMax[this->m_lineStyle];
+		f_max = (double)m_freqMax[m_lineStyle];
 		sample_max = (unsigned int)ceil(f_max / (double)delta_f);
 	}
 
@@ -1362,8 +1476,6 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 			led_index = LedIndex(row, col);
 		}
 
-		ApplyBrightness(bright, r, g, b);
-
 		ColorsToImage(led_index, r, g, b);
 	}
 }
@@ -1372,9 +1484,8 @@ void ws2812::OutputSpectrogram(const audio_sample *psample, unsigned int samples
 
 void ws2812::OutputOscilloscopeYt(const audio_sample * psample, unsigned int samples, unsigned int samplerate, unsigned int channels, audio_sample peak)
 {
-	unsigned int	rows = this->m_rows;
-	unsigned int	cols = this->m_columns;
-	unsigned int	bright = this->m_brightness;
+	unsigned int	rows = m_rows;
+	unsigned int	cols = m_columns;
 
 	unsigned int	col, row;
 	unsigned int	sample_index;
@@ -1391,12 +1502,12 @@ void ws2812::OutputOscilloscopeYt(const audio_sample * psample, unsigned int sam
 	audio_sample	duration;
 	unsigned int	samples_per_col;
 	unsigned int	max_wfm;
-	bool			softTrigger = this->m_peakValues;
+	bool			softTrigger = m_peakValues;
 
 	// min is offset
-	offset = (audio_sample)this->m_amplMin[this->m_lineStyle] / (audio_sample)offset_oscilloscope_div;
+	offset = (audio_sample)m_amplMin[m_lineStyle] / (audio_sample)offset_oscilloscope_div;
 	// max is gain
-	val_max = ((audio_sample)this->m_amplMax[this->m_lineStyle] / (audio_sample)gain_oscilloscope_div);
+	val_max = ((audio_sample)m_amplMax[m_lineStyle] / (audio_sample)gain_oscilloscope_div);
 	if (val_max > 0)
 		val_max = 1 / val_max;	// 0.1 ... 1.0
 	else
@@ -1620,17 +1731,14 @@ void ws2812::OutputOscilloscopeYt(const audio_sample * psample, unsigned int sam
 
 		AddPersistenceOscilloscope(led_index, r, g, b);
 
-		ApplyBrightness(bright, r, g, b);
-
 		ColorsToImage(led_index, r, g, b);
 	}
 }
 
 void ws2812::OutputOscilloscopeXy(const audio_sample * psample, unsigned int samples, unsigned int samplerate, unsigned int channels, audio_sample peak)
 {
-	unsigned int	rows = this->m_rows;
-	unsigned int	cols = this->m_columns;
-	unsigned int	bright = this->m_brightness;
+	unsigned int	rows = m_rows;
+	unsigned int	cols = m_columns;
 
 	unsigned int	col, row;
 	unsigned int	sample_index;
@@ -1647,9 +1755,9 @@ void ws2812::OutputOscilloscopeXy(const audio_sample * psample, unsigned int sam
 	audio_sample	m_y, n_y;
 
 	// min is offset
-	offset = (audio_sample)this->m_amplMin[this->m_lineStyle] / (audio_sample)offset_oscilloscope_div;
+	offset = (audio_sample)m_amplMin[m_lineStyle] / (audio_sample)offset_oscilloscope_div;
 	// max is gain
-	val_max = ((audio_sample)this->m_amplMax[this->m_lineStyle] / (audio_sample)gain_oscilloscope_div);
+	val_max = ((audio_sample)m_amplMax[m_lineStyle] / (audio_sample)gain_oscilloscope_div);
 	if (val_max > 0)
 		val_max = 1 / val_max;	// 0.1 ... 1.0
 	else
@@ -1771,17 +1879,14 @@ void ws2812::OutputOscilloscopeXy(const audio_sample * psample, unsigned int sam
 
 		AddPersistenceOscilloscope(led_index, r, g, b);
 
-		ApplyBrightness(bright, r, g, b);
-
 		ColorsToImage(led_index, r, g, b);
 	}
 }
 
 void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int samples, unsigned int samplerate, unsigned int channels, audio_sample peak)
 {
-	unsigned int	rows = this->m_rows;
-	unsigned int	cols = this->m_columns;
-	unsigned int	bright = this->m_brightness;
+	unsigned int	rows = m_rows;
+	unsigned int	cols = m_columns;
 
 	unsigned int	col, row;
 	unsigned int	sample_index;
@@ -1795,12 +1900,12 @@ void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int sample
 	audio_sample	val_max;
 	audio_sample	val_min;
 	audio_sample	m, n;
-	bool			peakValues = this->m_peakValues && false;	// disabled
+	bool			peakValues = m_peakValues && false;	// disabled
 
 	// min is offset
-	offset = (audio_sample)this->m_amplMin[this->m_lineStyle] / 100;	// -1.0 ... 1.0
+	offset = (audio_sample)m_amplMin[m_lineStyle] / 100;	// -1.0 ... 1.0
 	// max is gain
-	val_max = ((audio_sample)this->m_amplMax[this->m_lineStyle] / 10);	// 1.0 ... 10.0
+	val_max = ((audio_sample)m_amplMax[m_lineStyle] / 10);	// 1.0 ... 10.0
 	if (val_max > 0)
 		val_max = 1 / val_max;	// 0.1 ... 1.0
 	else
@@ -1889,9 +1994,6 @@ void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int sample
 				// off
 				r = g = b = 0;
 			}
-
-			ApplyBrightness(bright, r, g, b);
-
 			ColorsToImage(led_index, r, g, b);
 		}
 	}
@@ -1947,9 +2049,6 @@ void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int sample
 				// off
 				r = g = b = 0;
 			}
-
-			ApplyBrightness(bright, r, g, b);
-
 			ColorsToImage(led_index, r, g, b);
 		}
 	}
@@ -1958,12 +2057,13 @@ void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int sample
 
 void ws2812::CalcAndOutput(void)
 {
-	double	abs_time;
+	double			abs_time;
+	unsigned int	bufferSize = m_outputSize;
 
 	m_timerActive = true;
 
 	// get current track time
-	if (visStream != nullptr && visStream->get_absolute_time(abs_time)) {
+	if (visStream != nullptr && visStream->get_absolute_time(abs_time) && bufferSize > 0) {
 		audio_chunk_fast_impl	chunk;
 
 		switch (m_lineStyle)
@@ -2029,14 +2129,14 @@ void ws2812::CalcAndOutput(void)
 						else
 							OutputOscilloscopeYt(psample, samples, sample_rate, channels, peak);
 
-						// convert image
-						ImageToBuffer(&m_outputBuffer[1], m_bufferSize - 1);
 						// a value of 1 is used as start byte
 						// and must not occur in other bytes in the buffer
 						m_outputBuffer[0] = 1;
+						// convert image
+						ImageToBuffer(&m_outputBuffer[1], bufferSize - 1);
 
 						// send buffer
-						WriteABuffer(m_outputBuffer, m_bufferSize);
+						WriteABuffer(m_outputBuffer, bufferSize);
 					}
 					else {
 						// no samples ?
@@ -2070,14 +2170,14 @@ void ws2812::CalcAndOutput(void)
 					// create image
 					OutputOscillogram(psample, samples, sample_rate, channels, peak);
 
-					// convert image
-					ImageToBuffer(&m_outputBuffer[1], m_bufferSize - 1);
 					// a value of 1 is used as start byte
 					// and must not occur in other bytes in the buffer
 					m_outputBuffer[0] = 1;
+					// convert image
+					ImageToBuffer(&m_outputBuffer[1], bufferSize - 1);
 
 					// send buffer
-					WriteABuffer(m_outputBuffer, m_bufferSize);
+					WriteABuffer(m_outputBuffer, bufferSize);
 				}
 				else {
 					// no samples ?
@@ -2112,13 +2212,13 @@ void ws2812::CalcAndOutput(void)
 						OutputSpectrogram(psample, samples, channels, peak, delta_f);
 
 						// convert image
-						ImageToBuffer(&m_outputBuffer[1], m_bufferSize - 1);
+						ImageToBuffer(&m_outputBuffer[1], bufferSize - 1);
 						// a value of 1 is used as start byte
 						// and must not occur in other bytes in the buffer
 						m_outputBuffer[0] = 1;
 
 						// send buffer
-						WriteABuffer(m_outputBuffer, m_bufferSize);
+						WriteABuffer(m_outputBuffer, bufferSize);
 					}
 					else {
 						// no samples ?
@@ -2130,7 +2230,22 @@ void ws2812::CalcAndOutput(void)
 			}
 			break;
 
+		case ws2812_led_test:
+			// a value of 1 is used as start byte
+			// and must not occur in other bytes in the buffer
+			m_outputBuffer[0] = 1;
+			// fill buffer with test color
+			LedTestToBuffer(&m_outputBuffer[1], bufferSize - 1);
+
+			// send buffer
+			WriteABuffer(m_outputBuffer, bufferSize);
+			break;
+
+
 		default:
+		case ws2812_spectrum_simple:
+		case ws2812_spectrum_green_red_bars:
+		case ws2812_spectrum_fire_lines:
 			{
 				unsigned int			fft_size = m_fftSize;
 
@@ -2151,14 +2266,14 @@ void ws2812::CalcAndOutput(void)
 						// create image
 						OutputSpectrumBars(psample, samples, channels, peak, delta_f);
 
-						// convert image
-						ImageToBuffer(&m_outputBuffer[1], m_bufferSize - 1);
 						// a value of 1 is used as start byte
 						// and must not occur in other bytes in the buffer
 						m_outputBuffer[0] = 1;
+						// convert image
+						ImageToBuffer(&m_outputBuffer[1], bufferSize - 1);
 
 						// send buffer
-						WriteABuffer(m_outputBuffer, m_bufferSize);
+						WriteABuffer(m_outputBuffer, bufferSize);
 					}
 					else {
 						// no samples ?
@@ -2655,7 +2770,7 @@ bool GetLineStyle(unsigned int *lineStyle)
 void ws2812::GetLineStyle(unsigned int *lineStyle)
 {
 	if (lineStyle != NULL)
-		*lineStyle = (unsigned int)this->m_lineStyle;
+		*lineStyle = (unsigned int)m_lineStyle;
 }
 
 bool SetLedColors(unsigned int ledColors)
@@ -2671,7 +2786,13 @@ bool SetLedColors(unsigned int ledColors)
 void ws2812::SetLedColors(enum led_colors ledColors)
 {
 	if (ledColors >= 0 && ledColors < ws2812_led_colors_no) {
-		this->m_ledColors = ledColors;
+		m_ledColors = ledColors;
+
+		// update output buffer size
+		if (m_ledColors > ws2812_led_colors_rgb)
+			m_outputSize = 1 + 4 * m_ledNo;
+		else
+			m_outputSize = 1 + 3 * m_ledNo;
 	}
 }
 
@@ -2687,7 +2808,7 @@ bool GetLedColors(unsigned int *ledColors)
 void ws2812::GetLedColors(unsigned int *ledColors)
 {
 	if (ledColors != NULL)
-		*ledColors = (unsigned int)this->m_ledColors;
+		*ledColors = (unsigned int)m_ledColors;
 }
 
 bool GetMinAmplitudeIsOffset(void)
@@ -2724,6 +2845,59 @@ bool GetMaxAmplitudeIsGain(void)
 		}
 	}
 	return false;
+}
+
+bool GetLedTestMode(void)
+{
+	unsigned int	lineStyle = 0;
+
+	if (ws2812_global) {
+		ws2812_global->GetLineStyle(&lineStyle);
+
+		if (lineStyle == ws2812_led_test)
+			return true;
+	}
+	return false;
+}
+
+bool SetLedTestVal(unsigned int idx, unsigned int val)
+{
+	if (ws2812_global) {
+		ws2812_global->SetLedTestVal(idx, val);
+
+		return true;
+	}
+	return false;
+}
+
+void ws2812::SetLedTestVal(unsigned int idx, unsigned int val)
+{
+	// WRGB
+	switch (idx)
+	{
+	case 0:		// red
+		if (val < 256)
+			m_testColor = SET_COLOR_R(m_testColor, val);
+		break;
+
+	case 1:		// green
+		if (val < 256)
+			m_testColor = SET_COLOR_G(m_testColor, val);
+		break;
+
+	case 2:		// blue
+		if (val < 256)
+			m_testColor = SET_COLOR_B(m_testColor, val);
+		break;
+
+	case 3:		// white
+		if (val < 256)
+			m_testColor = SET_COLOR_W(m_testColor, val);
+		break;
+
+	default:
+		break;
+	}
 }
 
 bool SetBrightness(unsigned int brightness)
@@ -3146,11 +3320,11 @@ bool ws2812::AllocateBuffers()
 	// count of leds
 	m_ledNo = m_rows * m_columns;
 
-	// start byte + GRB for each LED
-	m_bufferSize = 1 + 3 * m_ledNo;
+	// start byte + RGBW for each LED
+	m_bufferSize = 1 + 4 * m_ledNo;
 
 	m_outputBuffer		= new unsigned char[m_bufferSize];
-	m_imageBuffer			= new unsigned int[m_ledNo];
+	m_imageBuffer		= new unsigned int[m_ledNo];
 	m_persistenceBuffer	= new unsigned int[m_ledNo];
 	m_counterBuffer		= new unsigned int[m_ledNo];
 	m_indexLut			= new unsigned int[m_ledNo];
@@ -3164,7 +3338,7 @@ bool ws2812::AllocateBuffers()
 		&& m_colorTab)
 	{
 		ZeroMemory(m_outputBuffer,		m_bufferSize * sizeof(unsigned char));
-		ZeroMemory(m_imageBuffer,			m_ledNo * sizeof(unsigned int));
+		ZeroMemory(m_imageBuffer,		m_ledNo * sizeof(unsigned int));
 		ZeroMemory(m_persistenceBuffer,	m_ledNo * sizeof(unsigned int));
 		ZeroMemory(m_counterBuffer,		m_ledNo * sizeof(unsigned int));
 		ZeroMemory(m_indexLut,			m_ledNo * sizeof(unsigned int));
@@ -3492,6 +3666,7 @@ ws2812::ws2812()
 
 	m_ledNo = 0;
 	m_bufferSize = 0;
+	m_outputSize = 0;
 	m_outputBuffer = nullptr;
 	m_imageBuffer = nullptr;
 	m_persistenceBuffer = nullptr;
@@ -3559,9 +3734,8 @@ ws2812::ws2812()
 
 			tmp = GetCfgLedColors();
 			if (tmp >= ws2812_led_colors_no)
-				m_ledColors = ws2812_led_colors_grb;
-			else
-				m_ledColors = (enum led_colors)tmp;
+				tmp = (unsigned int)ws2812_led_colors_grb;
+			SetLedColors((enum led_colors)tmp);
 
 			InitIndexLut();
 
@@ -3601,6 +3775,7 @@ ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, enum ws2
 
 	m_ledNo = 0;
 	m_bufferSize = 0;
+	m_outputSize = 0;
 	m_outputBuffer = nullptr;
 	m_imageBuffer = nullptr;
 	m_persistenceBuffer = nullptr;
@@ -3665,7 +3840,7 @@ ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, enum ws2
 			m_peakValues = true;
 
 			m_ledMode = GetLedMode(0, 0);
-			m_ledColors = ws2812_led_colors_grb;
+			SetLedColors(ws2812_led_colors_grb);
 
 			InitIndexLut();
 

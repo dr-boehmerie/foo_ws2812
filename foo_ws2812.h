@@ -36,6 +36,12 @@
 #define GET_COLOR_R(_RGB_)			(((_RGB_) >> 16) & 0xFF)
 #define GET_COLOR_G(_RGB_)			(((_RGB_) >> 8) & 0xFF)
 #define GET_COLOR_B(_RGB_)			((_RGB_) & 0xFF)
+#define GET_COLOR_W(_WRGB_)			(((_WRGB_) >> 24) & 0xFF)
+
+#define SET_COLOR_R(_RGB_,_R_)		((_RGB_) & 0xFF00FFFF) | (((_R_) & 0xFF) << 16)
+#define SET_COLOR_G(_RGB_,_G_)		((_RGB_) & 0xFFFF00FF) | (((_G_) & 0xFF) << 8)
+#define SET_COLOR_B(_RGB_,_B_)		((_RGB_) & 0xFFFFFF00) | (((_B_) & 0xFF) << 0)
+#define SET_COLOR_W(_WRGB_,_W_)		((_WRGB_) & 0x00FFFFFF) | (((_W_) & 0xFF) << 24)
 
 enum line_style
 {
@@ -51,6 +57,8 @@ enum line_style
 
 	ws2812_oscillogram_horizontal,		// oscillogram, moving horizontally
 	ws2812_oscillogram_vertical,		// oscillogram, moving vertically
+
+	ws2812_led_test,					// all leds the same color, user values rgbw
 
 	ws2812_line_style_no
 };
@@ -92,6 +100,8 @@ enum led_colors
 	ws2812_led_colors_grb,		// WS2812 default
 	ws2812_led_colors_brg,		// Renkforce (TM1829)
 	ws2812_led_colors_rgb,
+	ws2812_led_colors_grbw,		// SK6812GRBW
+	ws2812_led_colors_rgbw,		// SK6812RGBW
 
 	ws2812_led_colors_no
 };
@@ -124,6 +134,8 @@ public:
 	bool ConfigMatrix(int rows, int cols, enum start_led start_led, enum led_direction led_dir);
 	bool SetComPort(unsigned int port);
 	bool SetComBaudrate(enum ws2812_baudrate baudrate);
+
+	void SetLedTestVal(unsigned int idx, unsigned int val);
 
 	void SetBrightness(unsigned int brightness);
 	void GetBrightness(unsigned int *brightness);
@@ -186,8 +198,10 @@ private:
 	void AddPersistenceSpectrum(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
 	void AddPersistenceOscilloscope(unsigned int led_index, unsigned int &r, unsigned int &g, unsigned int &b);
 	void ApplyBrightness(unsigned int brightness, unsigned int &r, unsigned int &g, unsigned int &b);
+	void ApplyBrightness(unsigned int brightness, unsigned int & r, unsigned int & g, unsigned int & b, unsigned int & w);
 	void ColorsToImage(unsigned int led_index, unsigned int r, unsigned int g, unsigned int b);
 	void ImageToBuffer(unsigned char * buffer, unsigned int bufferSize);
+	void LedTestToBuffer(unsigned char * buffer, unsigned int bufferSize);
 	void ImageScrollLeft(void);
 	void ImageScrollRight(void);
 	void ImageScrollUp(void);
@@ -202,11 +216,11 @@ private:
 
 public:
 	static const unsigned int	rows_min = 1;
-	static const unsigned int	rows_max = 240;
+	static const unsigned int	rows_max = 300;
 	static const unsigned int	rows_def = 8;
 
 	static const unsigned int	columns_min = 1;
-	static const unsigned int	columns_max = 240;
+	static const unsigned int	columns_max = 300;
 	static const unsigned int	columns_def = 8;
 
 	static const unsigned int	port_min = 1;
@@ -273,7 +287,8 @@ private:
 	unsigned int			m_comPort;
 	enum ws2812_baudrate	m_comBaudrate;
 
-	unsigned int			m_bufferSize;
+	unsigned int			m_bufferSize;				// 1 + m_ledNo * 4
+	unsigned int			m_outputSize;				// 1 + m_ledNo * (4 if m_ledColors == rgbw, 3 otherwise)
 	unsigned char			*m_outputBuffer;			// data to be sent to the arduino
 	unsigned int			*m_imageBuffer;				// image (xRGB)
 	unsigned int			*m_persistenceBuffer;		// image persistence (xRGB)
@@ -283,6 +298,8 @@ private:
 
 	const unsigned int		m_colorNo = 1000;
 	unsigned int			*m_colorTab;				// xRGB
+
+	unsigned int			m_testColor;				// WRGB
 
 	audio_sample			m_colorsPerRow;
 	audio_sample			m_colorsPerCol;
@@ -330,6 +347,8 @@ bool GetLineStyle(unsigned int *lineStyle);
 bool GetLedColors(unsigned int *ledColors);
 bool GetMinAmplitudeIsOffset(void);
 bool GetMaxAmplitudeIsGain(void);
+bool GetLedTestMode(void);
+bool SetLedTestVal(unsigned int idx, unsigned int val);
 
 bool GetAmplitudeMinMax(int *min, int *max);
 bool GetFrequencyMinMax(int *min, int *max);
