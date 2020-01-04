@@ -67,35 +67,39 @@ static const GUID guid_cfg_logAmplitude = { 0x62f8a4ab, 0x3a4f, 0x41fa,{ 0xb4, 0
 // {B3E9A0FF-00CA-4948-A35E-F56D8B8D8CF2}
 static const GUID guid_cfg_peakValues = { 0xb3e9a0ff, 0xca, 0x4948,{ 0xa3, 0x5e, 0xf5, 0x6d, 0x8b, 0x8d, 0x8c, 0xf2 } };
 // {CC865229-9DA4-431F-BC9A-3F7B03B51E03}
-static const GUID guid_cfg_spectrum_colors = { 0xcc865229, 0x9da4, 0x431f,{ 0xbc, 0x9a, 0x3f, 0x7b, 0x3, 0xb5, 0x1e, 0x3 } };
+static const GUID guid_cfg_spectrumColors = { 0xcc865229, 0x9da4, 0x431f,{ 0xbc, 0x9a, 0x3f, 0x7b, 0x3, 0xb5, 0x1e, 0x3 } };
 // {396CC84D-1E1B-403D-9916-5F9DB1932654}
-static const GUID guid_cfg_spectrogram_colors = { 0x396cc84d, 0x1e1b, 0x403d,{ 0x99, 0x16, 0x5f, 0x9d, 0xb1, 0x93, 0x26, 0x54 } };
+static const GUID guid_cfg_spectrogramColors = { 0x396cc84d, 0x1e1b, 0x403d,{ 0x99, 0x16, 0x5f, 0x9d, 0xb1, 0x93, 0x26, 0x54 } };
 // {0E749577-B1F0-45A2-AC8C-DC977750AAEE}
-static const GUID guid_cfg_oscilloscope_colors = { 0xe749577, 0xb1f0, 0x45a2,{ 0xac, 0x8c, 0xdc, 0x97, 0x77, 0x50, 0xaa, 0xee } };
+static const GUID guid_cfg_oscilloscopeColors = { 0xe749577, 0xb1f0, 0x45a2,{ 0xac, 0x8c, 0xdc, 0x97, 0x77, 0x50, 0xaa, 0xee } };
 // {90A0F093-3114-4F1A-8AF7-301A80C86826}
-static const GUID guid_cfg_spectrum_bar_colors = { 0x90a0f093, 0x3114, 0x4f1a,{ 0x8a, 0xf7, 0x30, 0x1a, 0x80, 0xc8, 0x68, 0x26 } };
+static const GUID guid_cfg_spectrumBarColors = { 0x90a0f093, 0x3114, 0x4f1a,{ 0x8a, 0xf7, 0x30, 0x1a, 0x80, 0xc8, 0x68, 0x26 } };
 // {7FA96B16-3590-4BB1-B547-1F5C3DD7E0EF}
-static const GUID guid_cfg_spectrum_fire_colors = { 0x7fa96b16, 0x3590, 0x4bb1,{ 0xb5, 0x47, 0x1f, 0x5c, 0x3d, 0xd7, 0xe0, 0xef } };
+static const GUID guid_cfg_spectrumFireColors = { 0x7fa96b16, 0x3590, 0x4bb1,{ 0xb5, 0x47, 0x1f, 0x5c, 0x3d, 0xd7, 0xe0, 0xef } };
 // {CCC8A326-E6CE-4DEF-B14C-4395BD4B1965}
-static const GUID guid_cfg_spectrum_ampl_min = { 0xccc8a326, 0xe6ce, 0x4def,{ 0xb1, 0x4c, 0x43, 0x95, 0xbd, 0x4b, 0x19, 0x65 } };
+static const GUID guid_cfg_spectrumAmplitudeMin = { 0xccc8a326, 0xe6ce, 0x4def,{ 0xb1, 0x4c, 0x43, 0x95, 0xbd, 0x4b, 0x19, 0x65 } };
 // {CC47051B-9783-4168-A57B-E7FC6BE4A482}
-static const GUID guid_cfg_spectrum_ampl_max = { 0xcc47051b, 0x9783, 0x4168,{ 0xa5, 0x7b, 0xe7, 0xfc, 0x6b, 0xe4, 0xa4, 0x82 } };
+static const GUID guid_cfg_spectrumAmplitudeMax = { 0xcc47051b, 0x9783, 0x4168,{ 0xa5, 0x7b, 0xe7, 0xfc, 0x6b, 0xe4, 0xa4, 0x82 } };
 // {DE0564D4-631C-49FF-99E8-0C7ADF04CC6F}
-static const GUID guid_cfg_spectrogram_ampl_min = { 0xde0564d4, 0x631c, 0x49ff,{ 0x99, 0xe8, 0xc, 0x7a, 0xdf, 0x4, 0xcc, 0x6f } };
+static const GUID guid_cfg_spectrogramAmplitudeMin = { 0xde0564d4, 0x631c, 0x49ff,{ 0x99, 0xe8, 0xc, 0x7a, 0xdf, 0x4, 0xcc, 0x6f } };
 // {1EF1856E-DBD6-4B06-B89A-C09B842EC362}
-static const GUID guid_cfg_spectrogram_ampl_max = { 0x1ef1856e, 0xdbd6, 0x4b06,{ 0xb8, 0x9a, 0xc0, 0x9b, 0x84, 0x2e, 0xc3, 0x62 } };
+static const GUID guid_cfg_spectrogramAmplitudeMax = { 0x1ef1856e, 0xdbd6, 0x4b06,{ 0xb8, 0x9a, 0xc0, 0x9b, 0x84, 0x2e, 0xc3, 0x62 } };
 // {986AEF83-3597-4643-AF91-30FE49603FA2}
-static const GUID guid_cfg_oscilloscope_offset = { 0x986aef83, 0x3597, 0x4643,{ 0xaf, 0x91, 0x30, 0xfe, 0x49, 0x60, 0x3f, 0xa2 } };
+static const GUID guid_cfg_oscilloscopeOffset = { 0x986aef83, 0x3597, 0x4643,{ 0xaf, 0x91, 0x30, 0xfe, 0x49, 0x60, 0x3f, 0xa2 } };
 // {98275E99-75F1-4E8C-845A-165080F40A9F}
-static const GUID guid_cfg_oscilloscope_amplitude = { 0x98275e99, 0x75f1, 0x4e8c,{ 0x84, 0x5a, 0x16, 0x50, 0x80, 0xf4, 0xa, 0x9f } };
+static const GUID guid_cfg_oscilloscopeAmplitude = { 0x98275e99, 0x75f1, 0x4e8c,{ 0x84, 0x5a, 0x16, 0x50, 0x80, 0xf4, 0xa, 0x9f } };
 // {74F6E873-A006-453B-91BE-D94262708142}
-static const GUID guid_cfg_spectrum_freq_min = { 0x74f6e873, 0xa006, 0x453b,{ 0x91, 0xbe, 0xd9, 0x42, 0x62, 0x70, 0x81, 0x42 } };
+static const GUID guid_cfg_spectrumFrequencyMin = { 0x74f6e873, 0xa006, 0x453b,{ 0x91, 0xbe, 0xd9, 0x42, 0x62, 0x70, 0x81, 0x42 } };
 // {5DD613E0-C796-4075-81EB-343F33B95217}
-static const GUID guid_cfg_spectrum_freq_max = { 0x5dd613e0, 0xc796, 0x4075,{ 0x81, 0xeb, 0x34, 0x3f, 0x33, 0xb9, 0x52, 0x17 } };
+static const GUID guid_cfg_spectrumFrequencyMax = { 0x5dd613e0, 0xc796, 0x4075,{ 0x81, 0xeb, 0x34, 0x3f, 0x33, 0xb9, 0x52, 0x17 } };
 // {82924D91-2EBC-48C0-AE88-6E2EC8BB46A4}
-static const GUID guid_cfg_spectrogram_freq_min = { 0x82924d91, 0x2ebc, 0x48c0,{ 0xae, 0x88, 0x6e, 0x2e, 0xc8, 0xbb, 0x46, 0xa4 } };
+static const GUID guid_cfg_spectrogramFrequencyMin = { 0x82924d91, 0x2ebc, 0x48c0,{ 0xae, 0x88, 0x6e, 0x2e, 0xc8, 0xbb, 0x46, 0xa4 } };
 // {3C273D16-C12B-4FA6-9C8F-D3BD04AAFDF5}
-static const GUID guid_cfg_spectrogram_freq_max = { 0x3c273d16, 0xc12b, 0x4fa6,{ 0x9c, 0x8f, 0xd3, 0xbd, 0x4, 0xaa, 0xfd, 0xf5 } };
+static const GUID guid_cfg_spectrogramFrequencyMax = { 0x3c273d16, 0xc12b, 0x4fa6,{ 0x9c, 0x8f, 0xd3, 0xbd, 0x4, 0xaa, 0xfd, 0xf5 } };
+// {D0E61672-47F0-4C3F-AD57-38B41A7F0F73}
+static const GUID guid_cfg_ledStripeSof = { 0xd0e61672, 0x47f0, 0x4c3f, { 0xad, 0x57, 0x38, 0xb4, 0x1a, 0x7f, 0xf, 0x73 } };
+// {46D11564-6E28-459A-89D7-B410A80796F1}
+static const GUID guid_cfg_currentLimit = { 0x46d11564, 0x6e28, 0x459a, { 0x89, 0xd7, 0xb4, 0x10, 0xa8, 0x7, 0x96, 0xf1 } };
 
 
 // This GUID identifies our Advanced Preferences branch (replace with your own when reusing code).
@@ -109,12 +113,13 @@ enum {
 	default_cfg_brightness = ws2812::brightness_def,
 	default_cfg_updateInterval = ws2812::timerInterval_def,
 	default_cfg_comPort = ws2812::port_def,
-	default_cfg_comBaudrate = ws2812_baudrate_115200,
-	default_cfg_startLed = ws2812_top_left,
-	default_cfg_ledDirection = ws2812_led_dir_common,
-	default_cfg_ledColors = ws2812_led_colors_grb,
+	default_cfg_comBaudrate = static_cast<unsigned int>(ws2812_baudrate::e115200),
+	default_cfg_startLed = static_cast<unsigned int>(ws2812_start_led::top_left),
+	default_cfg_ledDirection = static_cast<unsigned int>(ws2812_led_direction::common),
+	default_cfg_ledColors = static_cast<unsigned int>(ws2812_led_colors::eGRB),
+	default_cfg_currentLimit = 0,
 
-	default_cfg_lineStyle = ws2812_spectrum_simple,
+	default_cfg_lineStyle = static_cast<unsigned int>(ws2812_style::spectrum_simple),
 	default_cfg_logFrequency = 1,
 	default_cfg_logAmplitude = 1,
 	default_cfg_peakValues = 1,
@@ -140,27 +145,27 @@ static const char * default_cfg_spectrumBarColors = "#00FF00,#C8C800,#FF0000";
 static const char * default_cfg_spectrumFireColors = "#00FF00,#C8C800,#FF0000";
 static const char * default_cfg_spectrogramColors = "#000000,#00007F,#00C800,#C8C800,#FF0000";
 static const char * default_cfg_oscilloscopeColors = "#000000,#FFFFFF";
-
+static const char * default_cfg_ledStripeSof = "1";
 
 // TODO language dependend strings, number of entries should depend on enum start_led
-LPCTSTR		cfg_startLedStr[ws2812_start_led_no] = { L"Top Left", L"Top Right", L"Bottom Left", L"Bottom Right" };
-LRESULT		cfg_startLedId[ws2812_start_led_no];
+LPCTSTR		cfg_startLedStr[static_cast<unsigned int>(ws2812_start_led::eNo)] = { L"Top Left", L"Top Right", L"Bottom Left", L"Bottom Right" };
+LRESULT		cfg_startLedId[static_cast<unsigned int>(ws2812_start_led::eNo)];
 
 // TODO number of entries should depend on enum led_dir
-LPCTSTR		cfg_ledDirStr[ws2812_led_dir_no] = { L"Common", L"Alternating" };
-LRESULT		cfg_ledDirId[ws2812_led_dir_no];
+LPCTSTR		cfg_ledDirStr[static_cast<unsigned int>(ws2812_led_direction::eNo)] = { L"Common", L"Alternating" };
+LRESULT		cfg_ledDirId[static_cast<unsigned int>(ws2812_led_direction::eNo)];
 
 // TODO number of entries should depend on enum led_colors
-LPCTSTR		cfg_ledColorsStr[ws2812_led_colors_no] = { L"GRB", L"BRG", L"RGB", L"GRBW", L"RGBW" };
-LRESULT		cfg_ledColorsId[ws2812_led_colors_no];
+LPCTSTR		cfg_ledColorsStr[static_cast<unsigned int>(ws2812_led_colors::eNo)] = { L"GRB", L"BRG", L"RGB", L"GRBW", L"RGBW" };
+LRESULT		cfg_ledColorsId[static_cast<unsigned int>(ws2812_led_colors::eNo)];
 
 // TODO number of entries should depend on enum line_style
-LPCTSTR		cfg_lineStyleStr[ws2812_line_style_no] = { L"Simple", L"Bars", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe (Yt)", L"Oscilloscpe (XY)", L"Oscillogram (hori)", L"Oscillogram (vert)", L"LED Test" };
-LRESULT		cfg_lineStyleId[ws2812_line_style_no];
+LPCTSTR		cfg_lineStyleStr[static_cast<unsigned int>(ws2812_style::eNo)] = { L"Simple", L"Bars", L"Fire", L"Spectrogram (hori)", L"Spectrogram (vert)", L"Oscilloscpe (Yt)", L"Oscilloscpe (XY)", L"Oscillogram (hori)", L"Oscillogram (vert)", L"LED Test" };
+LRESULT		cfg_lineStyleId[static_cast<unsigned int>(ws2812_style::eNo)];
 
 // TODO number of entries should depend on enum ws2812_baudrate
-LPCTSTR		cfg_baudrateStr[ws2812_baudrate_no] = { L"9600", L"14400", L"19200", L"38400", L"56000", L"57600", L"115200", L"128000", L"250000", L"256000", L"500000" };
-LRESULT		cfg_baudrateId[ws2812_baudrate_no];
+LPCTSTR		cfg_baudrateStr[static_cast<unsigned int>(ws2812_baudrate::eNo)] = { L"9600", L"14400", L"19200", L"38400", L"56000", L"57600", L"115200", L"128000", L"250000", L"256000", L"500000" };
+LRESULT		cfg_baudrateId[static_cast<unsigned int>(ws2812_baudrate::eNo)];
 
 static cfg_uint cfg_matrixRows(guid_cfg_matrixRows, default_cfg_matrixRows);
 static cfg_uint cfg_matrixCols(guid_cfg_matrixCols, default_cfg_matrixCols);
@@ -177,26 +182,30 @@ static cfg_uint cfg_logFrequency(guid_cfg_logFrequency, default_cfg_logFrequency
 static cfg_uint cfg_logAmplitude(guid_cfg_logAmplitude, default_cfg_logAmplitude);
 static cfg_uint cfg_peakValues(guid_cfg_peakValues, default_cfg_peakValues);
 
-static cfg_int cfg_spectrumAmplMin(guid_cfg_spectrum_ampl_min, default_cfg_spectrum_ampl_min);
-static cfg_int cfg_spectrumAmplMax(guid_cfg_spectrum_ampl_max, default_cfg_spectrum_ampl_max);
+static cfg_int cfg_spectrumAmplMin(guid_cfg_spectrumAmplitudeMin, default_cfg_spectrum_ampl_min);
+static cfg_int cfg_spectrumAmplMax(guid_cfg_spectrumAmplitudeMax, default_cfg_spectrum_ampl_max);
 
-static cfg_int cfg_spectrogramAmplMin(guid_cfg_spectrogram_ampl_min, default_cfg_spectrogram_ampl_min);
-static cfg_int cfg_spectrogramAmplMax(guid_cfg_spectrogram_ampl_max, default_cfg_spectrogram_ampl_max);
+static cfg_int cfg_spectrogramAmplMin(guid_cfg_spectrogramAmplitudeMin, default_cfg_spectrogram_ampl_min);
+static cfg_int cfg_spectrogramAmplMax(guid_cfg_spectrogramAmplitudeMax, default_cfg_spectrogram_ampl_max);
 
-static cfg_int cfg_oscilloscopeOffset(guid_cfg_oscilloscope_offset, default_cfg_oscilloscope_offset);
-static cfg_int cfg_oscilloscopeAmplitude(guid_cfg_oscilloscope_amplitude, default_cfg_oscilloscope_amplitude);
+static cfg_int cfg_oscilloscopeOffset(guid_cfg_oscilloscopeOffset, default_cfg_oscilloscope_offset);
+static cfg_int cfg_oscilloscopeAmplitude(guid_cfg_oscilloscopeAmplitude, default_cfg_oscilloscope_amplitude);
 
-static cfg_int cfg_spectrumFreqMin(guid_cfg_spectrum_freq_min, default_cfg_spectrum_freq_min);
-static cfg_int cfg_spectrumFreqMax(guid_cfg_spectrum_freq_max, default_cfg_spectrum_freq_max);
+static cfg_int cfg_spectrumFreqMin(guid_cfg_spectrumFrequencyMin, default_cfg_spectrum_freq_min);
+static cfg_int cfg_spectrumFreqMax(guid_cfg_spectrumFrequencyMax, default_cfg_spectrum_freq_max);
 
-static cfg_int cfg_spectrogramFreqMin(guid_cfg_spectrogram_freq_min, default_cfg_spectrogram_freq_min);
-static cfg_int cfg_spectrogramFreqMax(guid_cfg_spectrogram_freq_max, default_cfg_spectrogram_freq_max);
+static cfg_int cfg_spectrogramFreqMin(guid_cfg_spectrogramFrequencyMin, default_cfg_spectrogram_freq_min);
+static cfg_int cfg_spectrogramFreqMax(guid_cfg_spectrogramFrequencyMax, default_cfg_spectrogram_freq_max);
 
-static cfg_string cfg_spectrumColors(guid_cfg_spectrum_colors, default_cfg_spectrumColors);
-static cfg_string cfg_spectrumBarColors(guid_cfg_spectrum_bar_colors, default_cfg_spectrumBarColors);
-static cfg_string cfg_spectrumFireColors(guid_cfg_spectrum_fire_colors, default_cfg_spectrumFireColors);
-static cfg_string cfg_spectrogramColors(guid_cfg_spectrogram_colors, default_cfg_spectrogramColors);
-static cfg_string cfg_oscilloscopeColors(guid_cfg_oscilloscope_colors, default_cfg_oscilloscopeColors);
+static cfg_string cfg_spectrumColors(guid_cfg_spectrumColors, default_cfg_spectrumColors);
+static cfg_string cfg_spectrumBarColors(guid_cfg_spectrumBarColors, default_cfg_spectrumBarColors);
+static cfg_string cfg_spectrumFireColors(guid_cfg_spectrumFireColors, default_cfg_spectrumFireColors);
+static cfg_string cfg_spectrogramColors(guid_cfg_spectrogramColors, default_cfg_spectrogramColors);
+static cfg_string cfg_oscilloscopeColors(guid_cfg_oscilloscopeColors, default_cfg_oscilloscopeColors);
+
+static cfg_string cfg_ledStripeSof(guid_cfg_ledStripeSof, default_cfg_ledStripeSof);
+
+static cfg_uint cfg_currentLimit(guid_cfg_currentLimit, default_cfg_currentLimit);
 
 static advconfig_branch_factory g_advconfigBranch("WS2812 Output", guid_advconfig_branch, advconfig_branch::guid_branch_tools, 0);
 
@@ -225,6 +234,7 @@ public:
 		COMMAND_HANDLER_EX(IDC_BRIGHTNESS, EN_CHANGE, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_UPDATE_INTERVAL, EN_CHANGE, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_COM_PORT, EN_CHANGE, OnEditChange)
+		COMMAND_HANDLER_EX(IDC_CURRENT_LIMIT, EN_CHANGE, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_START_LED, CBN_SELCHANGE, OnCBChange)
 		COMMAND_HANDLER_EX(IDC_LED_DIR, CBN_SELCHANGE, OnCBChange)
 		COMMAND_HANDLER_EX(IDC_LED_COLORS, CBN_SELCHANGE, OnCBChange)
@@ -238,6 +248,7 @@ public:
 		COMMAND_HANDLER_EX(IDC_TXT_SPECTRUM_FIRE_COLORS, EN_CHANGE, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_TXT_SPECTROGRAM_COLORS, EN_CHANGE, OnEditChange)
 		COMMAND_HANDLER_EX(IDC_TXT_OSCILLOSCOPE_COLORS, EN_CHANGE, OnEditChange)
+		COMMAND_HANDLER_EX(IDC_LED_STRIPE_SOF, EN_CHANGE, OnEditChange)
 	END_MSG_MAP()
 private:
 	BOOL OnInitDialog(CWindow, LPARAM);
@@ -260,7 +271,9 @@ BOOL CWS2812Preferences::OnInitDialog(CWindow, LPARAM) {
 	SetDlgItemInt(IDC_BRIGHTNESS, cfg_brightness, FALSE);
 	SetDlgItemInt(IDC_UPDATE_INTERVAL, cfg_updateInterval, FALSE);
 	SetDlgItemInt(IDC_COM_PORT, cfg_comPort, FALSE);
+	SetDlgItemInt(IDC_CURRENT_LIMIT, cfg_currentLimit, FALSE);
 
+	// checkboxes
 	CheckDlgButton(IDC_LOG_FREQ, cfg_logFrequency);
 	CheckDlgButton(IDC_LOG_AMPL, cfg_logAmplitude);
 	CheckDlgButton(IDC_PEAK_VALS, cfg_peakValues);
@@ -340,6 +353,9 @@ BOOL CWS2812Preferences::OnInitDialog(CWindow, LPARAM) {
 	pattern = cfg_oscilloscopeColors;
 	uSetDlgItemText(*this, IDC_TXT_OSCILLOSCOPE_COLORS, pattern);
 
+	pattern = cfg_ledStripeSof;
+	uSetDlgItemText(*this, IDC_LED_STRIPE_SOF, pattern);
+
 	// update matrix info
 	UpdateMatrixInfo();
 
@@ -370,6 +386,7 @@ void CWS2812Preferences::reset() {
 	SetDlgItemInt(IDC_BRIGHTNESS, default_cfg_brightness, FALSE);
 	SetDlgItemInt(IDC_UPDATE_INTERVAL, default_cfg_updateInterval, FALSE);
 	SetDlgItemInt(IDC_COM_PORT, default_cfg_comPort, FALSE);
+	SetDlgItemInt(IDC_CURRENT_LIMIT, default_cfg_currentLimit, FALSE);
 
 	CheckDlgButton(IDC_LOG_FREQ, default_cfg_logFrequency);
 	CheckDlgButton(IDC_LOG_AMPL, default_cfg_logAmplitude);
@@ -386,6 +403,8 @@ void CWS2812Preferences::reset() {
 	uSetDlgItemText(*this, IDC_TXT_SPECTRUM_FIRE_COLORS, default_cfg_spectrumFireColors);
 	uSetDlgItemText(*this, IDC_TXT_SPECTROGRAM_COLORS, default_cfg_spectrogramColors);
 	uSetDlgItemText(*this, IDC_TXT_OSCILLOSCOPE_COLORS, default_cfg_oscilloscopeColors);
+
+	uSetDlgItemText(*this, IDC_LED_STRIPE_SOF, default_cfg_ledStripeSof);
 
 	// update matrix info
 	UpdateMatrixInfo();
@@ -433,6 +452,10 @@ void CWS2812Preferences::apply() {
 	val = GetDlgItemInt(IDC_COM_PORT, NULL, FALSE);
 	changed |= (cfg_comPort != val);
 	cfg_comPort = val;
+
+	val = GetDlgItemInt(IDC_CURRENT_LIMIT, NULL, FALSE);
+	changed |= (cfg_currentLimit != val);
+	cfg_currentLimit = val;
 
 	val = IsDlgButtonChecked(IDC_LOG_FREQ);
 	changed |= (cfg_logFrequency != val);
@@ -508,6 +531,8 @@ void CWS2812Preferences::apply() {
 	uGetDlgItemText(*this, IDC_TXT_OSCILLOSCOPE_COLORS, pattern);
 	cfg_oscilloscopeColors = pattern;
 
+	uGetDlgItemText(*this, IDC_LED_STRIPE_SOF, pattern);
+	cfg_ledStripeSof = pattern;
 
 	cbChanged = false;
 
@@ -516,31 +541,34 @@ void CWS2812Preferences::apply() {
 	isActive = StopOutput();
 
 	// write configuration values into the driver
-	ConfigMatrix(cfg_matrixRows, cfg_matrixCols, cfg_startLed, cfg_ledDirection);
-	SetLedColors(cfg_ledColors);
+	ConfigMatrix(cfg_matrixRows, cfg_matrixCols, cfg_startLed, cfg_ledDirection, cfg_ledColors);
+	SetLedStripeSof(cfg_ledStripeSof);
 	SetBrightness(cfg_brightness);
+	SetCurrentLimit(cfg_currentLimit);
 	SetInterval(cfg_updateInterval);
 	SetComPort(cfg_comPort);
 	SetComBaudrate(cfg_comBaudrate);
 
-	SetLineStyle(cfg_lineStyle);
+	SetStyle(cfg_lineStyle);
 	SetScaling(cfg_logFrequency, cfg_logAmplitude, cfg_peakValues);
 
-	const char *colors = NULL;
-	switch (cfg_lineStyle)
+	const char *colors = nullptr;
+	unsigned int style = cfg_lineStyle;
+	switch (static_cast<ws2812_style>(style))
 	{
 	default:
-	case ws2812_spectrum_simple:			colors = GetCfgSpectrumColors();		break;
-	case ws2812_spectrum_green_red_bars:	colors = GetCfgSpectrumBarColors();		break;
-	case ws2812_spectrum_fire_lines:		colors = GetCfgSpectrumFireColors();	break;
-	case ws2812_spectrogram_horizontal:		colors = GetCfgSpectrogramColors();		break;
-	case ws2812_spectrogram_vertical:		colors = GetCfgSpectrogramColors();		break;
-	case ws2812_oscilloscope_yt:			colors = GetCfgOscilloscopeColors();	break;
-	case ws2812_oscilloscope_xy:			colors = GetCfgOscilloscopeColors();	break;
-	case ws2812_oscillogram_horizontal:		colors = GetCfgOscilloscopeColors();	break;
-	case ws2812_oscillogram_vertical:		colors = GetCfgOscilloscopeColors();	break;
+	case ws2812_style::spectrum_simple:			colors = GetCfgSpectrumColors();		break;
+	case ws2812_style::spectrum_green_red_bars:	colors = GetCfgSpectrumBarColors();		break;
+	case ws2812_style::spectrum_fire_lines:		colors = GetCfgSpectrumFireColors();	break;
+	case ws2812_style::spectrogram_horizontal:	colors = GetCfgSpectrogramColors();		break;
+	case ws2812_style::spectrogram_vertical:	colors = GetCfgSpectrogramColors();		break;
+	case ws2812_style::oscilloscope_yt:			colors = GetCfgOscilloscopeColors();	break;
+	case ws2812_style::oscilloscope_xy:			colors = GetCfgOscilloscopeColors();	break;
+	case ws2812_style::oscillogram_horizontal:	colors = GetCfgOscilloscopeColors();	break;
+	case ws2812_style::oscillogram_vertical:	colors = GetCfgOscilloscopeColors();	break;
 	}
-	InitColorTab(colors);
+	if (colors)
+		InitColorTab(colors);
 
 	// update the matrix info text
 	UpdateMatrixInfo();
@@ -586,6 +614,9 @@ bool CWS2812Preferences::HasChanged() {
 	uGetDlgItemText(*this, IDC_TXT_OSCILLOSCOPE_COLORS, pattern);
 	changed |= (uStringCompare(cfg_oscilloscopeColors, pattern) != 0);
 
+	uGetDlgItemText(*this, IDC_LED_STRIPE_SOF, pattern);
+	changed |= (uStringCompare(cfg_ledStripeSof, pattern) != 0);
+
 
 	changed |= cbChanged;
 
@@ -601,7 +632,7 @@ void CWS2812Preferences::OnChanged() {
 
 void CWS2812Preferences::UpdateMatrixInfo(void)
 {
-	UINT	rows, cols, total, brightness;
+	UINT	rows, cols, ledNo, brightness;
 	double	time, current;
 	WCHAR	text[100];
 
@@ -611,15 +642,20 @@ void CWS2812Preferences::UpdateMatrixInfo(void)
 	brightness = GetDlgItemInt(IDC_BRIGHTNESS, NULL, FALSE);
 
 	// count of LEDs
-	total = rows * cols;
+	ledNo = rows * cols;
 
 	// led transfer time: reset plus 1.25us per led
-	time = 50 + ceil((double)total * 1.25);
+	time = 50 + ceil((double)ledNo * 1.25);
 
 	// maximum power consumption (max 60mA per LED)
-	current = 0.06 * (double)total * ((double)ws2812::brightness_max / 100);
+	double ledCurrent = 3 * 0.020;
 
-	_stprintf_s(text, L"%u LEDs: %.2f A; %.0f us", total, current, time);
+	if (cfg_ledColors >= static_cast<unsigned int>(ws2812_led_colors::eGRBW))
+		ledCurrent = 4 * 0.020;
+
+	current = ledCurrent * (double)ledNo * ((double)ws2812::brightness_max / 100);
+
+	_stprintf_s(text, L"%u LEDs: %.2f A; %.0f us", ledNo, current, time);
 	SetDlgItemText(IDC_MATRIX_INFO, text);
 }
 
@@ -730,44 +766,39 @@ const char * GetCfgOscilloscopeColors()
 	return cfg_oscilloscopeColors;
 }
 
-void GetCfgSpectrumAmplitudeMinMax(int *min, int *max)
+const char * GetCfgLedStripeSof()
 {
-	if (min)
-		*min = cfg_spectrumAmplMin;
-	if (max)
-		*max = cfg_spectrumAmplMax;
+	return cfg_ledStripeSof;
 }
 
-void GetCfgSpectrogramAmplitudeMinMax(int *min, int *max)
+void GetCfgSpectrumAmplitudeMinMax(int &min, int &max)
 {
-	if (min)
-		*min = cfg_spectrogramAmplMin;
-	if (max)
-		*max = cfg_spectrogramAmplMax;
+	min = cfg_spectrumAmplMin;
+	max = cfg_spectrumAmplMax;
 }
 
-void GetCfgOscilloscopeOffsetAmplitude(int *offset, int *amplitude)
+void GetCfgSpectrogramAmplitudeMinMax(int &min, int &max)
 {
-	if (offset)
-		*offset = cfg_oscilloscopeOffset;
-	if (amplitude)
-		*amplitude = cfg_oscilloscopeAmplitude;
+	min = cfg_spectrogramAmplMin;
+	max = cfg_spectrogramAmplMax;
 }
 
-void GetCfgSpectrumFrequencyMinMax(int *min, int *max)
+void GetCfgOscilloscopeOffsetAmplitude(int &offset, int &amplitude)
 {
-	if (min)
-		*min = cfg_spectrumFreqMin;
-	if (max)
-		*max = cfg_spectrumFreqMax;
+	offset = cfg_oscilloscopeOffset;
+	amplitude = cfg_oscilloscopeAmplitude;
 }
 
-void GetCfgSpectrogramFrequencyMinMax(int *min, int *max)
+void GetCfgSpectrumFrequencyMinMax(int &min, int &max)
 {
-	if (min)
-		*min = cfg_spectrogramFreqMin;
-	if (max)
-		*max = cfg_spectrogramFreqMax;
+	min = cfg_spectrumFreqMin;
+	max = cfg_spectrumFreqMax;
+}
+
+void GetCfgSpectrogramFrequencyMinMax(int &min, int &max)
+{
+	min = cfg_spectrogramFreqMin;
+	max = cfg_spectrogramFreqMax;
 }
 
 

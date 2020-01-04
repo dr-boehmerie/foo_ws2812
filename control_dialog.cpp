@@ -119,14 +119,14 @@ private:
 	BOOL OnHScroll(int x, short y, HWND wnd);
 
 	LPCTSTR m_text_brightness = L"Brightness";
-	LPCTSTR m_text_interval   = L"Update Interval";
-	LPCTSTR m_text_freq_min   = L"Min. Frequency";
-	LPCTSTR m_text_freq_max   = L"Max. Frequency";
-	LPCTSTR m_text_ampl_min   = L"Min. Amplitude";
-	LPCTSTR m_text_ampl_max   = L"Max. Amplitude";
-	LPCTSTR m_text_offset     = L"Offset";
-	LPCTSTR m_text_amplitude  = L"Amplitude";
-	LPCTSTR m_text_gain       = L"Gain";
+	LPCTSTR m_text_interval = L"Update Interval";
+	LPCTSTR m_text_freq_min = L"Min. Frequency";
+	LPCTSTR m_text_freq_max = L"Max. Frequency";
+	LPCTSTR m_text_ampl_min = L"Min. Amplitude";
+	LPCTSTR m_text_ampl_max = L"Max. Amplitude";
+	LPCTSTR m_text_offset = L"Offset";
+	LPCTSTR m_text_amplitude = L"Amplitude";
+	LPCTSTR m_text_gain = L"Gain";
 
 	unsigned int m_interval_step = 10;
 
@@ -238,7 +238,7 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 		SetBrightness(val);
 
 		if (nSBCode != TB_THUMBTRACK) {
-			if (GetBrightness(&brightness))
+			if (GetBrightness(brightness))
 				SetCfgBrightness(brightness);
 		}
 	}
@@ -253,7 +253,7 @@ BOOL CWS2812ControlDialog::OnHScroll(int nSBCode, short nPos, HWND hwnd)
 		SetInterval(val);
 
 		if (nSBCode != TB_THUMBTRACK) {
-			if (GetInterval(&interval))
+			if (GetInterval(interval))
 				SetCfgUpdateInterval(interval);
 		}
 	}
@@ -416,9 +416,8 @@ void CWS2812ControlDialog::UpdateFrequencyAmplitudeSlider(void)
 		SetDlgItemText(IDC_TXT_AMPL_MAX, text);
 	}
 	else {
-
 		// frequency and amplitude scaling
-		GetFrequencyMinMax(&fmin, &fmax);
+		GetFrequencyMinMax(fmin, fmax);
 
 		m_slider_freq_min.SetRange(ws2812::frequency_min, ws2812::frequency_max, TRUE);
 		m_slider_freq_min.SetTicFreq((ws2812::frequency_max - ws2812::frequency_min) / 10);
@@ -434,7 +433,7 @@ void CWS2812ControlDialog::UpdateFrequencyAmplitudeSlider(void)
 		_stprintf_s(text, L"%s: %u Hz", m_text_freq_max, fmax);
 		SetDlgItemText(IDC_TXT_FREQ_MAX, text);
 
-		GetAmplitudeMinMax(&amin, &amax);
+		GetAmplitudeMinMax(amin, amax);
 
 		if (GetMinAmplitudeIsOffset()) {
 			// Oscilloscope: offset: -100 ... 100 -> -1.0 ... 1.0
@@ -487,7 +486,7 @@ void CWS2812ControlDialog::OnStyleClicked(UINT code, int id, CWindow hwnd)
 	LRESULT r = SendDlgItemMessage(id, BM_GETCHECK, 0, 0);
 
 	unsigned int style = 0;
-	const char *colors = NULL;
+	const char *colors = nullptr;
 
 	switch (id)
 	{
@@ -507,25 +506,25 @@ void CWS2812ControlDialog::OnStyleClicked(UINT code, int id, CWindow hwnd)
 
 	if (r) {
 		// save selected line style
-		SetLineStyle(style);
+		SetStyle(style);
 
-		if (GetLineStyle(&style)) {
+		if (GetLineStyle(style)) {
 			// init color tab
-			switch (style)
+			switch (static_cast<ws2812_style>(style))
 			{
 			default:
-			case ws2812_spectrum_simple:			colors = GetCfgSpectrumColors();		break;
-			case ws2812_spectrum_green_red_bars:	colors = GetCfgSpectrumBarColors();		break;
-			case ws2812_spectrum_fire_lines:		colors = GetCfgSpectrumFireColors();	break;
-			case ws2812_spectrogram_horizontal:		colors = GetCfgSpectrogramColors();		break;
-			case ws2812_spectrogram_vertical:		colors = GetCfgSpectrogramColors();		break;
-			case ws2812_oscilloscope_yt:			colors = GetCfgOscilloscopeColors();	break;
-			case ws2812_oscilloscope_xy:			colors = GetCfgOscilloscopeColors();	break;
-			case ws2812_oscillogram_horizontal:		colors = GetCfgOscilloscopeColors();	break;
-			case ws2812_oscillogram_vertical:		colors = GetCfgOscilloscopeColors();	break;
+			case ws2812_style::spectrum_simple:			colors = GetCfgSpectrumColors();		break;
+			case ws2812_style::spectrum_green_red_bars:	colors = GetCfgSpectrumBarColors();		break;
+			case ws2812_style::spectrum_fire_lines:		colors = GetCfgSpectrumFireColors();	break;
+			case ws2812_style::spectrogram_horizontal:	colors = GetCfgSpectrogramColors();		break;
+			case ws2812_style::spectrogram_vertical:	colors = GetCfgSpectrogramColors();		break;
+			case ws2812_style::oscilloscope_yt:			colors = GetCfgOscilloscopeColors();	break;
+			case ws2812_style::oscilloscope_xy:			colors = GetCfgOscilloscopeColors();	break;
+			case ws2812_style::oscillogram_horizontal:	colors = GetCfgOscilloscopeColors();	break;
+			case ws2812_style::oscillogram_vertical:	colors = GetCfgOscilloscopeColors();	break;
 			}
 
-			if (colors != NULL)
+			if (colors)
 				InitColorTab(colors);
 
 			SetCfgLineStyle(style);
@@ -575,7 +574,7 @@ void CWS2812ControlDialog::OnStopOutputClicked(UINT code, int id, CWindow hwnd)
 	if (StopOutput()) {
 		// disable "Stop" button
 		EnableButton(IDC_STOP_OUTPUT, false);
-		
+
 		// enable "Start" button
 		EnableButton(IDC_START_OUTPUT, true);
 	}
@@ -609,11 +608,11 @@ BOOL CWS2812ControlDialog::OnInitDialog(CWindow, LPARAM) {
 
 	// get slider controls
 	m_slider_brightness = GetDlgItem(IDC_SLIDER_BRIGHTNESS);
-	m_slider_interval   = GetDlgItem(IDC_SLIDER_INTERVAL);
-	m_slider_freq_min   = GetDlgItem(IDC_SLIDER_FREQ_MIN);
-	m_slider_freq_max   = GetDlgItem(IDC_SLIDER_FREQ_MAX);
-	m_slider_ampl_min   = GetDlgItem(IDC_SLIDER_AMPL_MIN);
-	m_slider_ampl_max   = GetDlgItem(IDC_SLIDER_AMPL_MAX);
+	m_slider_interval = GetDlgItem(IDC_SLIDER_INTERVAL);
+	m_slider_freq_min = GetDlgItem(IDC_SLIDER_FREQ_MIN);
+	m_slider_freq_max = GetDlgItem(IDC_SLIDER_FREQ_MAX);
+	m_slider_ampl_min = GetDlgItem(IDC_SLIDER_AMPL_MIN);
+	m_slider_ampl_max = GetDlgItem(IDC_SLIDER_AMPL_MAX);
 
 	unsigned int	style;
 	unsigned int	val;
@@ -621,7 +620,7 @@ BOOL CWS2812ControlDialog::OnInitDialog(CWindow, LPARAM) {
 	WCHAR			text[100];
 
 	style = 0;
-	GetLineStyle(&style);
+	GetLineStyle(style);
 	switch (style)
 	{
 	case 0:		r = SendDlgItemMessage(IDC_STYLE_0, BM_SETCHECK, BST_CHECKED, 0);		break;
@@ -638,7 +637,7 @@ BOOL CWS2812ControlDialog::OnInitDialog(CWindow, LPARAM) {
 	}
 
 	int logFreq = 0, logAmpl = 0, peaks = 0;
-	GetScaling(&logFreq, &logAmpl, &peaks);
+	GetScaling(logFreq, logAmpl, peaks);
 
 	if (logFreq > 0) {
 		r = SendDlgItemMessage(IDC_LOG_FREQUENCY, BM_SETCHECK, BST_CHECKED, 0);
@@ -662,7 +661,7 @@ BOOL CWS2812ControlDialog::OnInitDialog(CWindow, LPARAM) {
 	}
 
 	val = 0;
-	GetInterval(&val);
+	GetInterval(val);
 	m_slider_interval.SetRange(ws2812::timerInterval_min / m_interval_step, ws2812::timerInterval_max / m_interval_step, TRUE);
 	m_slider_interval.SetTicFreq((ws2812::timerInterval_max - ws2812::timerInterval_min) / (10 * m_interval_step));
 	m_slider_interval.SetPos(val / m_interval_step);
@@ -671,7 +670,7 @@ BOOL CWS2812ControlDialog::OnInitDialog(CWindow, LPARAM) {
 	SetDlgItemText(IDC_TXT_INTERVAL, text);
 
 	val = 0;
-	GetBrightness(&val);
+	GetBrightness(val);
 	m_slider_brightness.SetRange(ws2812::brightness_min, ws2812::brightness_max, TRUE);
 	m_slider_brightness.SetTicFreq((ws2812::brightness_max - ws2812::brightness_min) / 10);
 	m_slider_brightness.SetPos(val);

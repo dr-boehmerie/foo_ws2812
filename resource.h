@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
-// Microsoft Visual C++ generated include file.
-// Used by foo_ws2812.rc
+// Von Microsoft Visual C++ generierte Includedatei.
+// Verwendet durch foo_ws2812.rc
 //
 #define IDD_MYPREFERENCES               148
 #define IDD_CONTROL_DIALOG              149
@@ -17,7 +17,9 @@
 #define IDC_PREV                        1007
 #define IDC_MATRIX_INFO                 1007
 #define IDC_NEXT                        1008
+#define IDC_LED_STRIPE_SOF              1008
 #define IDC_RAND                        1009
+#define IDC_CURRENT_LIMIT               1009
 #define IDC_SAVE_CFG                    1010
 #define IDC_LOG_FREQ                    1014
 #define IDC_START_LED                   1015
