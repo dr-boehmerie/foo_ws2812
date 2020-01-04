@@ -36,7 +36,7 @@
 //##############################################################################
 
 #define USE_SERIAL_LIB      1
-#define USE_TM1829          0
+#define USE_TM1829          1
 #define USE_DUAL_STRIPES    0
 
 // Arduino Micro D5: PC6
@@ -63,7 +63,7 @@
 #if USE_DUAL_STRIPES
 #define NUMBER_OF_PIXELS   600
 #else
-#define NUMBER_OF_PIXELS   240
+#define NUMBER_OF_PIXELS   300
 #endif
 
 // number of bytes per pixel (3 for BRG, 4 for RGBW)
