@@ -591,6 +591,7 @@ bool CWS2812Preferences::HasChanged() {
 	changed |= GetDlgItemInt(IDC_COM_PORT, NULL, FALSE) != cfg_comPort;
 //	changed |= GetDlgItemInt(IDC_START_LED, NULL, FALSE) != cfg_startLed;
 //	changed |= GetDlgItemInt(IDC_LED_DIR, NULL, FALSE) != cfg_ledDirection;
+	changed |= GetDlgItemInt(IDC_CURRENT_LIMIT, NULL, FALSE) != cfg_currentLimit;
 
 //	changed |= GetDlgItemInt(IDC_LINE_STYLE, NULL, FALSE) != cfg_lineStyle;
 	changed |= IsDlgButtonChecked(IDC_LOG_FREQ) != cfg_logFrequency;
@@ -699,6 +700,11 @@ unsigned int GetCfgMatrixCols()
 unsigned int GetCfgBrightness()
 {
 	return cfg_brightness;
+}
+
+unsigned int GetCfgCurrentLimit()
+{
+	return cfg_currentLimit;
 }
 
 unsigned int GetCfgUpdateInterval()
@@ -851,6 +857,17 @@ bool SetCfgBrightness(unsigned int value)
 {
 	if (cfg_brightness != value) {
 		cfg_brightness = value;
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
+bool SetCfgCurrentLimit(unsigned int value)
+{
+	if (cfg_currentLimit != value) {
+		cfg_currentLimit = value;
 		return true;
 	}
 	else {

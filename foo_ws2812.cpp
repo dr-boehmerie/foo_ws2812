@@ -34,12 +34,12 @@
 
 
 // global class instance
-ws2812			*ws2812_global = nullptr;
+static std::unique_ptr<ws2812>	ws2812_global;
 
 
 
 // COM port handling taken from the MSDN
-BOOL ws2812::OpenPort(LPCWSTR gszPort, unsigned int port)
+BOOL ws2812::OpenPort(const LPCWSTR gszPort, const unsigned int port)
 {
 	if (m_hComm == INVALID_HANDLE_VALUE) {
 		WCHAR	portStr[32];
@@ -118,7 +118,7 @@ BOOL ws2812::ClosePort()
 	return false;
 }
 
-BOOL ws2812::WriteABuffer(const unsigned char * lpBuf, DWORD dwToWrite)
+BOOL ws2812::WriteABuffer(const unsigned char * lpBuf, const DWORD dwToWrite)
 {
 	OVERLAPPED osWrite = { 0 };
 	DWORD dwWritten;
@@ -302,8 +302,8 @@ ws2812_led_mode ws2812::GetLedMode(unsigned int startLed, unsigned int ledDir)
 
 void ws2812::InitIndexLut(void)
 {
-	unsigned int	rows = this->m_rows;
-	unsigned int	cols = this->m_columns;
+	const unsigned int	rows = this->m_rows;
+	const unsigned int	cols = this->m_columns;
 	unsigned int	row, col;
 	unsigned int	idx;
 
@@ -792,27 +792,42 @@ void ws2812::ColorsToImage(unsigned int led_index, unsigned int r, unsigned int 
 
 void ws2812::ClipColors(unsigned int &r, unsigned int &g, unsigned int &b)
 {
-	const auto valSof = m_ledSof.at(0);
-	const auto valMax = m_ledBrightnessMax;
+	const auto valMax = m_ledPwmLimit;
 
-	// all values < 2 are replaced by 0 (1 is reserved for start of block)
-	// and clip to 250 max brightness
-	if (r == valSof) r = 0; else if (r > valMax) r = valMax;
-	if (g == valSof) g = 0; else if (g > valMax) g = valMax;
-	if (b == valSof) b = 0; else if (b > valMax) b = valMax;
+	// clip to max
+	if (r > valMax) r = valMax;
+	if (g > valMax) g = valMax;
+	if (b > valMax) b = valMax;
+
+	// replace SOFs
+	for (auto valSof : m_ledSof) {
+		if (valSof < valMax) {
+			if (r == valSof) r = 0;
+			if (g == valSof) g = 0;
+			if (b == valSof) b = 0;
+		}
+	}
 }
 
 void ws2812::ClipColors(unsigned int &r, unsigned int &g, unsigned int &b, unsigned int &w)
 {
-	const auto valSof = m_ledSof.at(0);
-	const auto valMax = m_ledBrightnessMax;
+	const auto valMax = m_ledPwmLimit;
 
-	// all values < 2 are replaced by 0 (1 is reserved for start of block)
-	// and clip to 250 max brightness
-	if (r == valSof) r = 0; else if (r > valMax) r = valMax;
-	if (g == valSof) g = 0; else if (g > valMax) g = valMax;
-	if (b == valSof) b = 0; else if (b > valMax) b = valMax;
-	if (w == valSof) w = 0; else if (w > valMax) w = valMax;
+	// clip to max
+	if (r > valMax) r = valMax;
+	if (g > valMax) g = valMax;
+	if (b > valMax) b = valMax;
+	if (w > valMax) w = valMax;
+
+	// replace SOFs
+	for (auto valSof : m_ledSof) {
+		if (valSof < valMax) {
+			if (r == valSof) r = 0;
+			if (g == valSof) g = 0;
+			if (b == valSof) b = 0;
+			if (w == valSof) w = 0;
+		}
+	}
 }
 
 void ws2812::GetColorIndexes(unsigned int &r, unsigned int &g, unsigned int &b, unsigned int &w, unsigned int &no)
@@ -969,7 +984,6 @@ void ws2812::LedTestToBuffer(unsigned int offset, unsigned int count, unsigned i
 			w = GET_COLOR_W(m_testColor);
 
 			ApplyBrightness(bright, r, g, b, w);
-
 			ClipColors(r, g, b, w);
 
 			for (i = 0; i < count; i++) {
@@ -987,7 +1001,6 @@ void ws2812::LedTestToBuffer(unsigned int offset, unsigned int count, unsigned i
 			b = GET_COLOR_B(m_testColor);
 
 			ApplyBrightness(bright, r, g, b);
-
 			ClipColors(r, g, b);
 
 			for (i = 0; i < count; i++) {
@@ -2418,6 +2431,7 @@ void ws2812::OutputTest()
 		else {
 			// split image into horizontal slices
 			const unsigned int count = m_ledNo / stripeNo;
+			const unsigned int bufferCount = ((bufferSize - 1) / stripeNo) + 1;
 			unsigned int offset = 0;
 
 			for (unsigned int i = 0; i < stripeNo; i++) {
@@ -2426,10 +2440,10 @@ void ws2812::OutputTest()
 				m_outputBuffer[0] = m_ledSof.at(i);
 
 				// convert image
-				ImageToBuffer(offset, count, bufferSize);
+				LedTestToBuffer(offset, count, bufferCount);
 
 				// send buffer
-				WriteABuffer(m_outputBuffer.data(), bufferSize);
+				WriteABuffer(m_outputBuffer.data(), bufferCount);
 
 				offset += count;
 			}
@@ -2596,10 +2610,7 @@ void ws2812::CalcAndOutput(void)
 		break;
 
 		case ws2812_style::led_test:
-			if (m_outputBuffer.size() > 0)
-			{
-				OutputTest();
-			}
+			OutputTest();
 			break;
 
 
@@ -2673,7 +2684,15 @@ bool ws2812::StartOutput(void)
 {
 	if (m_initDone && m_timerStarted == false) {
 		if (OpenPort(NULL, m_comPort)) {
-			StartTimer();
+			if (StartTimer()) {
+				// okay
+			}
+			else {
+				popup_message::g_show("Start timer failed!", "WS2812 Output", popup_message::icon_error);
+			}
+		}
+		else {
+			popup_message::g_show("Open COM port failed!", "WS2812 Output", popup_message::icon_error);
 		}
 	}
 	return m_timerStarted;
@@ -2750,24 +2769,26 @@ bool ConfigMatrix(int rows, int cols, unsigned int start_led, unsigned int led_d
 bool ws2812::ConfigMatrix(int rows, int cols, unsigned int start_led, unsigned int led_dir, unsigned int led_colors)
 {
 	bool	timerRunning = false;
+	unsigned int	newRows = this->m_rows;
+	unsigned int	newCols = this->m_columns;
 
 	// allow change of one dimension only, the other must be < 0
-	if (rows < 0)
-		rows = this->m_rows;
-	if (cols < 0)
-		cols = this->m_columns;
+	if (rows > 0)
+		newRows = static_cast<unsigned int>(rows);
+	if (cols > 0)
+		newCols = static_cast<unsigned int>(cols);
 
-	if ((unsigned int)rows >= rows_min && (unsigned int)rows <= rows_max
-		&& (unsigned int)cols >= columns_min && (unsigned int)cols <= columns_max)
+	if (newRows >= rows_min && newRows <= rows_max
+		&& newCols >= columns_min && newCols <= columns_max)
 	{
-		if (this->m_rows != (unsigned int)rows
-			|| this->m_columns != (unsigned int)cols
+		if (this->m_rows != newRows
+			|| this->m_columns != newCols
 			|| this->m_ledColors != static_cast<ws2812_led_colors>(led_colors))
 		{
 			m_initDone = false;
 
-			this->m_rows = (unsigned int)rows;
-			this->m_columns = (unsigned int)cols;
+			this->m_rows = newRows;
+			this->m_columns = newCols;
 
 			// kill the timer
 			timerRunning = StopTimer();
@@ -2798,9 +2819,9 @@ bool ws2812::InitColorTab(void)
 {
 	unsigned int	i;
 	unsigned int	r, g, b;
-	float			r_start, g_start, b_start;
-	float			r_end, g_end, b_end;
-	float			r_step, g_step, b_step;
+	double			r_start, g_start, b_start;
+	double			r_end, g_end, b_end;
+	double			r_step, g_step, b_step;
 
 	if (m_colorTab.size() >= m_colorNo) {
 		// create default color tab: green to red
@@ -2818,9 +2839,9 @@ bool ws2812::InitColorTab(void)
 		b_step = (b_end - b_start) / (m_colorNo - 1);
 
 		for (i = 0; i < m_colorNo; i++) {
-			r = (unsigned int)floorf(r_start);
-			g = (unsigned int)floorf(g_start);
-			b = (unsigned int)floorf(b_start);
+			r = static_cast<unsigned int>(floor(r_start));
+			g = static_cast<unsigned int>(floor(g_start));
+			b = static_cast<unsigned int>(floor(b_start));
 			// ARGB
 			m_colorTab[i] = MAKE_COLOR(r, g, b, 0);
 
@@ -2838,15 +2859,15 @@ bool ws2812::InitColorTab(const unsigned int *initTab, unsigned int tabElements)
 {
 	unsigned int	i, j, i_end;
 	unsigned int	r, g, b, w;
-	float			colors_per_segment;
-	float			r_start, g_start, b_start, w_start;
-	float			r_end, g_end, b_end, w_end;
-	float			r_step, g_step, b_step, w_step;
+	double			colors_per_segment;
+	double			r_start, g_start, b_start, w_start;
+	double			r_end, g_end, b_end, w_end;
+	double			r_step, g_step, b_step, w_step;
 
 	if (m_colorTab.size() >= m_colorNo && initTab && tabElements > 0) {
 		if (tabElements > 1) {
 			// divide colorTab into segments
-			colors_per_segment = (float)m_colorNo / (float)(tabElements - 1);
+			colors_per_segment = (double)m_colorNo / (double)(tabElements - 1);
 
 			i = 0;
 			j = 0;
@@ -2855,19 +2876,19 @@ bool ws2812::InitColorTab(const unsigned int *initTab, unsigned int tabElements)
 			for (i = 0; i < m_colorNo; i++) {
 				if (i == i_end && j < (tabElements - 1)) {
 					// next initTab entry
-					r_start = (float)GET_COLOR_R(initTab[j]);
-					g_start = (float)GET_COLOR_G(initTab[j]);
-					b_start = (float)GET_COLOR_B(initTab[j]);
-					w_start = (float)GET_COLOR_W(initTab[j]);
+					r_start = GET_COLOR_R(initTab[j]);
+					g_start = GET_COLOR_G(initTab[j]);
+					b_start = GET_COLOR_B(initTab[j]);
+					w_start = GET_COLOR_W(initTab[j]);
 
-					r_end = (float)GET_COLOR_R(initTab[j + 1]);
-					g_end = (float)GET_COLOR_G(initTab[j + 1]);
-					b_end = (float)GET_COLOR_B(initTab[j + 1]);
-					w_end = (float)GET_COLOR_W(initTab[j + 1]);
+					r_end = GET_COLOR_R(initTab[j + 1]);
+					g_end = GET_COLOR_G(initTab[j + 1]);
+					b_end = GET_COLOR_B(initTab[j + 1]);
+					w_end = GET_COLOR_W(initTab[j + 1]);
 
 					// last colorTab index of this segment
 					j++;
-					i_end = (unsigned int)floor((float)j * colors_per_segment);
+					i_end = static_cast<unsigned int>(floor(j * colors_per_segment));
 
 					r_step = (r_end - r_start);
 					g_step = (g_end - g_start);
@@ -2876,24 +2897,24 @@ bool ws2812::InitColorTab(const unsigned int *initTab, unsigned int tabElements)
 
 					if (j < (tabElements - 1)) {
 						// dividing by count because the first entry of the next segment will hold the end color
-						r_step /= (float)(i_end - i);
-						g_step /= (float)(i_end - i);
-						b_step /= (float)(i_end - i);
-						w_step /= (float)(i_end - i);
+						r_step /= (double)(i_end - i);
+						g_step /= (double)(i_end - i);
+						b_step /= (double)(i_end - i);
+						w_step /= (double)(i_end - i);
 					}
 					else {
 						// dividing by count - 1 ensures that the last entry is filled with the end color
-						r_step /= (float)((i_end - i) - 1);
-						g_step /= (float)((i_end - i) - 1);
-						b_step /= (float)((i_end - i) - 1);
-						w_step /= (float)((i_end - i) - 1);
+						r_step /= (double)((i_end - i) - 1);
+						g_step /= (double)((i_end - i) - 1);
+						b_step /= (double)((i_end - i) - 1);
+						w_step /= (double)((i_end - i) - 1);
 					}
 				}
 
-				r = (unsigned int)floorf(r_start + 0.5f);
-				g = (unsigned int)floorf(g_start + 0.5f);
-				b = (unsigned int)floorf(b_start + 0.5f);
-				w = (unsigned int)floorf(w_start + 0.5f);
+				r = static_cast<unsigned int>(floor(r_start + 0.5));
+				g = static_cast<unsigned int>(floor(g_start + 0.5));
+				b = static_cast<unsigned int>(floor(b_start + 0.5));
+				w = static_cast<unsigned int>(floor(w_start + 0.5));
 
 				m_colorTab[i] = MAKE_COLOR(r, g, b, w);
 
@@ -3361,6 +3382,42 @@ void ws2812::SetCurrentLimit(unsigned int limit)
 	if (this->m_currentLimit != limit) {
 		this->m_currentLimit = limit;
 	}
+
+	if (this->m_currentLimit > 0) {
+		// update max. brightness
+		double ledCurrent;
+		double totalCurrent;
+		// 20mA per single led (?)
+		if (m_rgbw) {
+			ledCurrent = 4 * 0.020;
+		}
+		else {
+			ledCurrent = 3 * 0.020;
+		}
+		totalCurrent = ledCurrent * m_ledNo;
+		if (totalCurrent > this->m_currentLimit) {
+			// scale the maximum value
+			double maxPwm = floor((this->m_currentLimit / totalCurrent) * led_pwm_limit_max + 0.5);
+
+			if (maxPwm <= led_pwm_limit_min) {
+				this->m_ledPwmLimit = led_pwm_limit_min;
+			}
+			else if (maxPwm >= led_pwm_limit_max) {
+				this->m_ledPwmLimit = led_pwm_limit_max;
+			}
+			else {
+				this->m_ledPwmLimit = static_cast<unsigned int>(maxPwm);
+			}
+		}
+		else {
+			// default
+			this->m_ledPwmLimit = led_pwm_limit_def;
+		}
+	}
+	else {
+		// default
+		this->m_ledPwmLimit = led_pwm_limit_def;
+	}
 }
 
 void ws2812::GetCurrentLimit(unsigned int &limit)
@@ -3579,6 +3636,7 @@ void ws2812::SetInterval(unsigned int interval)
 	if (interval >= timerInterval_min && interval <= timerInterval_max) {
 		if (this->m_timerInterval != interval) {
 			this->m_timerInterval = interval;
+
 			if (m_hTimer != INVALID_HANDLE_VALUE) {
 				ChangeTimerQueueTimer(NULL, m_hTimer, this->m_timerStartDelay, this->m_timerInterval);
 			}
@@ -4228,6 +4286,8 @@ ws2812::ws2812()
 		if (m_brightness < 1 || m_brightness > 100)
 			m_brightness = 25;
 
+		SetCurrentLimit(GetCfgCurrentLimit());
+
 		if (m_initDone) {
 			const char *colors = nullptr;
 
@@ -4401,8 +4461,9 @@ ws2812::~ws2812()
 
 void InitOutput()
 {
-	if (ws2812_global == nullptr)
-		ws2812_global = new ws2812();
+	if (!ws2812_global) {
+		ws2812_global = std::make_unique<ws2812>();
+	}
 
 	if (ws2812_global) {
 
@@ -4412,7 +4473,6 @@ void InitOutput()
 void DeinitOutput()
 {
 	if (ws2812_global) {
-		delete ws2812_global;
-		ws2812_global = nullptr;
+		ws2812_global.release();
 	}
 }

@@ -258,6 +258,10 @@ public:
 	static const unsigned int	brightness_max = 80;		// %; limited by power supply (max. 60mA per LED)
 	static const unsigned int	brightness_def = 25;		// %
 
+	static const unsigned int	led_pwm_limit_min = 1;		// LED PWM value
+	static const unsigned int	led_pwm_limit_max = 255;	// LED PWM value
+	static const unsigned int	led_pwm_limit_def = 250;	// LED PWM value
+
 	static const unsigned int	sof_def = 1;				// Start of frame
 
 	static const unsigned int	timerInterval_min = 50;		// ms
@@ -291,7 +295,7 @@ private:
 	unsigned int			m_ledNo{ 0 };
 
 	unsigned int			m_brightness{ 0 };
-	unsigned int			m_ledBrightnessMax{ 250 };
+	unsigned int			m_ledPwmLimit{ led_pwm_limit_def };
 	unsigned int			m_currentLimit{ 0 };
 	ws2812_led_mode			m_ledMode{ ws2812_led_mode::top_left_common };
 	ws2812_style			m_lineStyle{ ws2812_style::spectrum_simple };
@@ -405,6 +409,7 @@ unsigned int GetCfgComBaudrate();
 unsigned int GetCfgMatrixRows();
 unsigned int GetCfgMatrixCols();
 unsigned int GetCfgBrightness();
+unsigned int GetCfgCurrentLimit();
 unsigned int GetCfgUpdateInterval();
 unsigned int GetCfgStartLed();
 unsigned int GetCfgLedDirection();
@@ -431,6 +436,7 @@ bool SetCfgComBaudrate(unsigned int value);
 bool SetCfgMatrixRows(unsigned int value);
 bool SetCfgMatrixCols(unsigned int value);
 bool SetCfgBrightness(unsigned int value);
+bool SetCfgCurrentLimit(unsigned int value);
 bool SetCfgUpdateInterval(unsigned int value);
 bool SetCfgStartLed(unsigned int value);
 bool SetCfgLedDirection(unsigned int value);
