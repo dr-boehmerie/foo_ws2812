@@ -710,6 +710,18 @@ void CWS2812ControlDialog::update() {
 	pfc::string_formatter state;
 	if (m_playback_control->playback_format_title(NULL, state, m_script, NULL, playback_control::display_level_all)) {
 		//Succeeded already.
+		uint64_t errCnt, busyCnt, okCnt;
+		if (GetStatistics(errCnt, busyCnt, okCnt)) {
+			pfc::string8 statistics = "";
+
+			char text[200] = "";
+			//sprintf_s(text, " | errCnt %llu; busy %llu; ok %llu", errCnt, busyCnt, okCnt);
+			sprintf_s (text, " | Ok %llu | Err %llu", okCnt, errCnt);
+
+			statistics.set_string(text);
+
+			state += statistics;
+		}
 	}
 	else if (m_playback_control->is_playing()) {
 		//Starting playback but not done opening the first track yet.

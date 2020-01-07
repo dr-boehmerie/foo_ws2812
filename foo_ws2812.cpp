@@ -41,13 +41,13 @@ static std::unique_ptr<ws2812>	ws2812_global;
 // COM port handling taken from the MSDN
 BOOL ws2812::OpenPort(const LPCWSTR gszPort, const unsigned int port)
 {
-	if (m_hComm == INVALID_HANDLE_VALUE) {
+	if (m_comHandle == INVALID_HANDLE_VALUE) {
 		WCHAR	portStr[32];
 		LPCWSTR	format = L"\\\\.\\COM%u";
 
 		wsprintf(portStr, format, port);
 
-		m_hComm = CreateFile(portStr,
+		m_comHandle = CreateFile(portStr,
 			GENERIC_READ | GENERIC_WRITE,
 			0,
 			0,
@@ -55,9 +55,10 @@ BOOL ws2812::OpenPort(const LPCWSTR gszPort, const unsigned int port)
 			FILE_FLAG_OVERLAPPED,
 			0);
 	}
-	if (m_hComm == INVALID_HANDLE_VALUE) {
+	if (m_comHandle == INVALID_HANDLE_VALUE) {
 		// error opening port; abort
-		m_commErr = GetLastError();
+		m_comError = GetLastError();
+		m_comErrorCnt++;
 		return false;
 	}
 
@@ -66,7 +67,7 @@ BOOL ws2812::OpenPort(const LPCWSTR gszPort, const unsigned int port)
 	ZeroMemory(&dcb, sizeof(dcb));
 
 	// get current DCB
-	if (GetCommState(m_hComm, &dcb)) {
+	if (GetCommState(m_comHandle, &dcb)) {
 		// 8 N 1
 		dcb.ByteSize = 8;
 		dcb.Parity = NOPARITY;
@@ -95,14 +96,28 @@ BOOL ws2812::OpenPort(const LPCWSTR gszPort, const unsigned int port)
 		dcb.fDtrControl = DTR_CONTROL_ENABLE;
 
 		// Set new state.
-		if (!SetCommState(m_hComm, &dcb)) {
+		if (!SetCommState(m_comHandle, &dcb)) {
 			// Error in SetCommState. Possibly a problem with the communications 
 			// port handle or a problem with the DCB structure itself.
-			m_commErr = GetLastError();
+			m_comError = GetLastError();
+			m_comErrorCnt++;
 
-			CloseHandle(m_hComm);
-			m_hComm = INVALID_HANDLE_VALUE;
+			CloseHandle(m_comHandle);
+			m_comHandle = INVALID_HANDLE_VALUE;
 			return false;
+		}
+		else {
+			// Create this write operation's OVERLAPPED structure's hEvent.
+			m_comWriteOvlp.hEvent = CreateEvent(NULL, TRUE, FALSE, TEXT("COMM_WriteEvent"));
+			if (m_comWriteOvlp.hEvent == NULL) {
+				// error creating overlapped event handle
+				m_comError = GetLastError();
+				m_comErrorCnt++;
+
+				CloseHandle(m_comHandle);
+				m_comHandle = INVALID_HANDLE_VALUE;
+				return false;
+			}
 		}
 	}
 	return true;
@@ -110,9 +125,17 @@ BOOL ws2812::OpenPort(const LPCWSTR gszPort, const unsigned int port)
 
 BOOL ws2812::ClosePort()
 {
-	if (m_hComm != INVALID_HANDLE_VALUE) {
-		CloseHandle(m_hComm);
-		m_hComm = INVALID_HANDLE_VALUE;
+	m_comErrorCnt = 0;
+	m_comBusyCnt = 0;
+	m_comOkCnt = 0;
+
+	if (m_comWriteOvlp.hEvent != NULL) {
+		CloseHandle(m_comWriteOvlp.hEvent);
+		m_comWriteOvlp.hEvent = NULL;
+	}
+	if (m_comHandle != INVALID_HANDLE_VALUE) {
+		CloseHandle(m_comHandle);
+		m_comHandle = INVALID_HANDLE_VALUE;
 		return true;
 	}
 	return false;
@@ -120,42 +143,62 @@ BOOL ws2812::ClosePort()
 
 BOOL ws2812::WriteABuffer(const unsigned char * lpBuf, const DWORD dwToWrite)
 {
-	OVERLAPPED osWrite = { 0 };
-	DWORD dwWritten;
-	DWORD dwRes;
-	BOOL fRes;
+	//OVERLAPPED osWrite = { 0 };
+	DWORD dwWritten = 0;
+	DWORD dwRes = 0;
+	BOOL fRes = FALSE;
 
 	// Port not opened?
-	if (m_hComm == INVALID_HANDLE_VALUE)
-		return FALSE;
-
-	// Create this write operation's OVERLAPPED structure's hEvent.
-	osWrite.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (osWrite.hEvent == NULL) {
-		// error creating overlapped event handle
+	if (m_comHandle == INVALID_HANDLE_VALUE) {
 		return FALSE;
 	}
 
+#if 0
+	// Create this write operation's OVERLAPPED structure's hEvent.
+	m_comWriteOvlp.hEvent = CreateEvent(NULL, TRUE, FALSE, TEXT("COMM_WriteEvent"));
+	if (m_comWriteOvlp.hEvent == NULL) {
+		// error creating overlapped event handle
+		return FALSE;
+	}
+#else
+	if (m_comWriteOvlp.hEvent == NULL) {
+		// error creating overlapped event handle
+		return FALSE;
+	}
+	else {
+		ResetEvent(m_comWriteOvlp.hEvent);
+	}
+#endif
+
 	// Issue write.
-	if (!WriteFile(m_hComm, lpBuf, dwToWrite, &dwWritten, &osWrite)) {
-		m_commErr = GetLastError();
-		if (m_commErr != ERROR_IO_PENDING) {
+	if (!WriteFile(m_comHandle, lpBuf, dwToWrite, &dwWritten, &m_comWriteOvlp)) {
+		m_comError = GetLastError();
+		if (m_comError != ERROR_IO_PENDING) {
 			// WriteFile failed, but isn't delayed. Report error and abort.
+			m_comErrorCnt++;
 			fRes = FALSE;
 		}
 		else {
 			// Write is pending.
+			m_comBusyCnt++;
+
 		//	dwRes = WaitForSingleObject(osWrite.hEvent, INFINITE);
-			dwRes = WaitForSingleObject(osWrite.hEvent, 1000);
+			dwRes = WaitForSingleObject(m_comWriteOvlp.hEvent, m_comWriteTimeout);
 			switch (dwRes)
 			{
-				// OVERLAPPED structure's event has been signaled. 
+			// OVERLAPPED structure's event has been signaled.
 			case WAIT_OBJECT_0:
-				if (!GetOverlappedResult(m_hComm, &osWrite, &dwWritten, FALSE))
+				if (!GetOverlappedResult(m_comHandle, &m_comWriteOvlp, &dwWritten, FALSE)) {
+					// failed
+					m_comError = dwRes;
+					m_comErrorCnt++;
 					fRes = FALSE;
-				else
+				}
+				else {
 					// Write operation completed successfully.
+					m_comOkCnt++;
 					fRes = TRUE;
+				}
 				break;
 
 			default:
@@ -163,6 +206,8 @@ BOOL ws2812::WriteABuffer(const unsigned char * lpBuf, const DWORD dwToWrite)
 				// An error has occurred in WaitForSingleObject.
 				// This usually indicates a problem with the
 				// OVERLAPPED structure's event handle.
+				m_comError = dwRes;
+				m_comErrorCnt++;
 				fRes = FALSE;
 				break;
 			}
@@ -170,10 +215,11 @@ BOOL ws2812::WriteABuffer(const unsigned char * lpBuf, const DWORD dwToWrite)
 	}
 	else {
 		// WriteFile completed immediately.
+		m_comOkCnt++;
 		fRes = TRUE;
 	}
 
-	CloseHandle(osWrite.hEvent);
+	//CloseHandle(m_comWriteOvlp.hEvent);
 	return fRes;
 }
 
@@ -191,9 +237,9 @@ bool ws2812::StartTimer()
 	else if (m_timerInterval > timerInterval_max)
 		m_timerInterval = timerInterval_max;
 
-	if (m_hTimer == INVALID_HANDLE_VALUE) {
+	if (m_timerHandle == INVALID_HANDLE_VALUE) {
 		// timer not created yet
-		bool r = CreateTimerQueueTimer(&m_hTimer, NULL,
+		bool r = CreateTimerQueueTimer(&m_timerHandle, NULL,
 			WaitOrTimerCallback, NULL, m_timerStartDelay,
 			m_timerInterval, WT_EXECUTELONGFUNCTION);
 		if (r) {
@@ -215,9 +261,9 @@ bool ws2812::StopTimer()
 {
 	m_timerStarted = false;
 
-	if (m_hTimer != INVALID_HANDLE_VALUE) {
-		DeleteTimerQueueTimer(NULL, m_hTimer, NULL);
-		m_hTimer = INVALID_HANDLE_VALUE;
+	if (m_timerHandle != INVALID_HANDLE_VALUE) {
+		DeleteTimerQueueTimer(NULL, m_timerHandle, NULL);
+		m_timerHandle = INVALID_HANDLE_VALUE;
 
 		// wait if the timer is currently active
 		while (m_timerActive) {
@@ -874,20 +920,21 @@ void ws2812::GetColorIndexes(unsigned int &r, unsigned int &g, unsigned int &b, 
 	}
 }
 
-void ws2812::ImageToBuffer(unsigned int offset, unsigned int count, unsigned int bufferSize)
+unsigned int ws2812::ImageToBuffer(unsigned int offset, unsigned int count, std::vector<unsigned char>& dst)
 {
 	unsigned int	i;
-	unsigned int	led_0;
-	unsigned int	led_1;
+	unsigned int	led_0, led_1;
 	unsigned int	incr = 1;
+	unsigned int	color;
 	unsigned int	r, g, b, w = 0;
 	unsigned int	r_i, g_i, b_i, w_i;
-	const unsigned int	bright = m_brightness;
+	const unsigned int	brightness = m_brightness;
+	const unsigned int	bufferSize = dst.size();
 
 	GetColorIndexes(r_i, g_i, b_i, w_i, incr);
 
 	if (bufferSize == 0 || incr == 0 || count == 0)
-		return;
+		return 0;
 
 	if (count > (bufferSize - 1) / incr)
 		count = (bufferSize - 1) / incr;
@@ -905,7 +952,9 @@ void ws2812::ImageToBuffer(unsigned int offset, unsigned int count, unsigned int
 	if (count > led_1 - led_0)
 		count = led_1 - led_0;
 
-	if (m_outputBuffer.size() >= (count * incr) && m_imageBuffer.size() >= count) {
+	auto &src = m_imageBuffer;
+
+	if (bufferSize >= (1 + count * incr) && src.size() >= count) {
 		// always skip the first byte (start of frame)
 		r_i += 1;
 		g_i += 1;
@@ -914,62 +963,77 @@ void ws2812::ImageToBuffer(unsigned int offset, unsigned int count, unsigned int
 
 		if (incr == 4) {
 			for (i = 0; i < count; i++) {
+				color = src[led_0++];
 				// get WRGB
-				r = GET_COLOR_R(m_imageBuffer[led_0]);
-				g = GET_COLOR_G(m_imageBuffer[led_0]);
-				b = GET_COLOR_B(m_imageBuffer[led_0]);
-				w = GET_COLOR_W(m_imageBuffer[led_0]);
-				led_0++;
+				r = GET_COLOR_R(color);
+				g = GET_COLOR_G(color);
+				b = GET_COLOR_B(color);
+				w = GET_COLOR_W(color);
 
-				ApplyBrightness(bright, r, g, b, w);
+				ApplyBrightness(brightness, r, g, b, w);
 				ClipColors(r, g, b, w);
 
 				// write colors to buffer
-				m_outputBuffer[incr * i + r_i] = (unsigned char)r;
-				m_outputBuffer[incr * i + g_i] = (unsigned char)g;
-				m_outputBuffer[incr * i + b_i] = (unsigned char)b;
-				m_outputBuffer[incr * i + w_i] = (unsigned char)w;
+				dst[incr * i + r_i] = static_cast<unsigned char>(r);
+				dst[incr * i + g_i] = static_cast<unsigned char>(g);
+				dst[incr * i + b_i] = static_cast<unsigned char>(b);
+				dst[incr * i + w_i] = static_cast<unsigned char>(w);
 			}
 		}
 		else {
 			for (i = 0; i < count; i++) {
+				color = src[led_0++];
 				// get RGB
-				r = GET_COLOR_R(m_imageBuffer[led_0]);
-				g = GET_COLOR_G(m_imageBuffer[led_0]);
-				b = GET_COLOR_B(m_imageBuffer[led_0]);
-				led_0++;
+				r = GET_COLOR_R(color);
+				g = GET_COLOR_G(color);
+				b = GET_COLOR_B(color);
 
-				ApplyBrightness(bright, r, g, b);
+				ApplyBrightness(brightness, r, g, b);
 				ClipColors(r, g, b);
 
 				// write colors to buffer
-				m_outputBuffer[incr * i + r_i] = (unsigned char)r;
-				m_outputBuffer[incr * i + g_i] = (unsigned char)g;
-				m_outputBuffer[incr * i + b_i] = (unsigned char)b;
+				dst[incr * i + r_i] = static_cast<unsigned char>(r);
+				dst[incr * i + g_i] = static_cast<unsigned char>(g);
+				dst[incr * i + b_i] = static_cast<unsigned char>(b);
 			}
 		}
 	}
+	return (1 + count * incr);
 }
 
-void ws2812::LedTestToBuffer(unsigned int offset, unsigned int count, unsigned int bufferSize)
+unsigned int ws2812::LedTestToBuffer(unsigned int offset, unsigned int count, std::vector<unsigned char>& dst)
 {
 	unsigned int	i;
+	unsigned int	led_0, led_1;
 	unsigned int	incr = 1;
 	unsigned int	r, g, b, w = 0;
 	unsigned int	r_i, g_i, b_i, w_i = 0;
 	const unsigned int	bright = m_brightness;
+	const unsigned int	color = m_testColor;
+	const unsigned int	bufferSize = dst.size();
 
 	GetColorIndexes(r_i, g_i, b_i, w_i, incr);
 
 	if (bufferSize == 0 || incr == 0)
-		return;
+		return 0;
 
 	if (count > (bufferSize - 1) / incr)
 		count = (bufferSize - 1) / incr;
 	if (count > m_ledNo)
 		count = m_ledNo;
 
-	if (m_outputBuffer.size() >= (count * incr)) {
+	led_0 = offset;
+	if (led_0 > m_ledNo)
+		led_0 = m_ledNo;
+
+	led_1 = led_0 + count;
+	if (led_1 > m_ledNo)
+		led_1 = m_ledNo;
+
+	if (count > led_1 - led_0)
+		count = led_1 - led_0;
+
+	if (bufferSize >= (1 + count * incr)) {
 		// always skip the first byte (start of frame)
 		r_i += 1;
 		g_i += 1;
@@ -978,39 +1042,40 @@ void ws2812::LedTestToBuffer(unsigned int offset, unsigned int count, unsigned i
 
 		if (incr == 4) {
 			// get WRGB
-			r = GET_COLOR_R(m_testColor);
-			g = GET_COLOR_G(m_testColor);
-			b = GET_COLOR_B(m_testColor);
-			w = GET_COLOR_W(m_testColor);
+			r = GET_COLOR_R(color);
+			g = GET_COLOR_G(color);
+			b = GET_COLOR_B(color);
+			w = GET_COLOR_W(color);
 
 			ApplyBrightness(bright, r, g, b, w);
 			ClipColors(r, g, b, w);
 
 			for (i = 0; i < count; i++) {
 				// write colors to buffer
-				m_outputBuffer[incr * i + r_i] = (unsigned char)r;
-				m_outputBuffer[incr * i + g_i] = (unsigned char)g;
-				m_outputBuffer[incr * i + b_i] = (unsigned char)b;
-				m_outputBuffer[incr * i + w_i] = (unsigned char)w;
+				dst[incr * i + r_i] = static_cast<unsigned char>(r);
+				dst[incr * i + g_i] = static_cast<unsigned char>(g);
+				dst[incr * i + b_i] = static_cast<unsigned char>(b);
+				dst[incr * i + w_i] = static_cast<unsigned char>(w);
 			}
 		}
 		else {
 			// get RGB
-			r = GET_COLOR_R(m_testColor);
-			g = GET_COLOR_G(m_testColor);
-			b = GET_COLOR_B(m_testColor);
+			r = GET_COLOR_R(color);
+			g = GET_COLOR_G(color);
+			b = GET_COLOR_B(color);
 
 			ApplyBrightness(bright, r, g, b);
 			ClipColors(r, g, b);
 
 			for (i = 0; i < count; i++) {
 				// write colors to buffer
-				m_outputBuffer[incr * i + r_i] = (unsigned char)r;
-				m_outputBuffer[incr * i + g_i] = (unsigned char)g;
-				m_outputBuffer[incr * i + b_i] = (unsigned char)b;
+				dst[incr * i + r_i] = static_cast<unsigned char>(r);
+				dst[incr * i + g_i] = static_cast<unsigned char>(g);
+				dst[incr * i + b_i] = static_cast<unsigned char>(b);
 			}
 		}
 	}
+	return (1 + count * incr);
 }
 
 void ws2812::ImageScrollLeft(void)
@@ -2371,82 +2436,111 @@ void ws2812::OutputOscillogram(const audio_sample * psample, unsigned int sample
 	}
 }
 
+std::vector<unsigned char>& ws2812::GetOutputBuffer()
+{
+	if (m_outputBufferActive == 0)
+		return m_outputBuffer0;
+	else
+		return m_outputBuffer1;
+}
+
 void ws2812::OutputImage()
 {
-	const unsigned int	bufferSize = m_outputBuffer.size();
 	const unsigned int	stripeNo = m_ledSof.size();
 
-	if (bufferSize > 0) {
-		if (stripeNo == 1) {
-			// a value of 1 is used as start byte
-			// and must not occur in other bytes in the buffer
-			m_outputBuffer[0] = m_ledSof.at(0);
+	if (stripeNo == 0) {
 
-			// convert image
-			ImageToBuffer(0, m_ledNo, bufferSize);
+	}
+	else if (stripeNo == 1) {
+		auto &dst = GetOutputBuffer();
+		unsigned int length;
+
+		// convert image
+		length = ImageToBuffer(0, m_ledNo, dst);
+		if (length > 0) {
+			// set stripe start of frame value
+			dst[0] = m_ledSof.at(0);
 
 			// send buffer
-			WriteABuffer(m_outputBuffer.data(), bufferSize);
+			WriteABuffer(dst.data(), length);
+
+			// toggle output buffer
+			m_outputBufferActive ^= 1;
 		}
-		else {
-			// split image into horizontal slices
-			const unsigned int count = m_ledNo / stripeNo;
-			const unsigned int bufferCount = ((bufferSize - 1) / stripeNo) + 1;
-			unsigned int offset = 0;
+	}
+	else {
+		// split image into horizontal slices
+		const unsigned int count = m_ledNo / stripeNo;
+		unsigned int offset = 0;
 
-			for (unsigned int i = 0; i < stripeNo; i++) {
-				// a value of 1 is used as start byte
-				// and must not occur in other bytes in the buffer
-				m_outputBuffer[0] = m_ledSof.at(i);
+		for (unsigned int i = 0; i < stripeNo; i++) {
+			auto &dst = GetOutputBuffer();
+			unsigned int length;
 
-				// convert image
-				ImageToBuffer(offset, count, bufferCount);
+			// convert image
+			length = ImageToBuffer(offset, count, dst);
+			if (length > 0) {
+				// set stripe start of frame value
+				dst[0] = m_ledSof.at(i);
 
 				// send buffer
-				WriteABuffer(m_outputBuffer.data(), bufferCount);
+				WriteABuffer(dst.data(), length);
 
-				offset += count;
+				// toggle output buffer
+				m_outputBufferActive ^= 1;
 			}
+			offset += count;
 		}
 	}
 }
 
 void ws2812::OutputTest()
 {
-	const unsigned int	bufferSize = m_outputBuffer.size();
 	const unsigned int	stripeNo = m_ledSof.size();
 
-	if (bufferSize > 0) {
-		if (stripeNo == 1) {
-			// a value of 1 is used as start byte
-			// and must not occur in other bytes in the buffer
-			m_outputBuffer[0] = m_ledSof.at(0);
+	if (stripeNo == 0) {
+		// invalid
+	}
+	else if (stripeNo == 1) {
+		auto &dst = GetOutputBuffer();
+		unsigned int length;
 
-			// fill output
-			LedTestToBuffer(0, m_ledNo, bufferSize);
+		// fill output
+		length = LedTestToBuffer(0, m_ledNo, dst);
+		if (length > 0) {
+			// set stripe start of frame value
+			dst[0] = m_ledSof.at(0);
 
 			// send buffer
-			WriteABuffer(m_outputBuffer.data(), bufferSize);
+			WriteABuffer(dst.data(), length);
+
+			// toggle output buffer
+			m_outputBufferActive ^= 1;
 		}
-		else {
-			// split image into horizontal slices
-			const unsigned int count = m_ledNo / stripeNo;
-			const unsigned int bufferCount = ((bufferSize - 1) / stripeNo) + 1;
-			unsigned int offset = 0;
+	}
+	else {
+		// split image into horizontal slices
+		const unsigned int count = m_ledNo / stripeNo;
+		unsigned int offset = 0;
 
-			for (unsigned int i = 0; i < stripeNo; i++) {
-				// a value of 1 is used as start byte
-				// and must not occur in other bytes in the buffer
-				m_outputBuffer[0] = m_ledSof.at(i);
+		for (unsigned int i = 0; i < stripeNo; i++) {
+			auto &dst = GetOutputBuffer();
+			unsigned int length;
 
-				// convert image
-				LedTestToBuffer(offset, count, bufferCount);
+			// convert image
+			length = LedTestToBuffer(offset, count, dst);
+			if (length > 0) {
+				// set stripe start of frame value
+				dst[0] = m_ledSof.at(i);
 
 				// send buffer
-				WriteABuffer(m_outputBuffer.data(), bufferCount);
+				WriteABuffer(dst.data(), length);
 
-				offset += count;
+				// toggle output buffer
+				m_outputBufferActive ^= 1;
 			}
+
+			offset += count;
 		}
 	}
 }
@@ -3637,8 +3731,8 @@ void ws2812::SetInterval(unsigned int interval)
 		if (this->m_timerInterval != interval) {
 			this->m_timerInterval = interval;
 
-			if (m_hTimer != INVALID_HANDLE_VALUE) {
-				ChangeTimerQueueTimer(NULL, m_hTimer, this->m_timerStartDelay, this->m_timerInterval);
+			if (m_timerHandle != INVALID_HANDLE_VALUE) {
+				ChangeTimerQueueTimer(NULL, m_timerHandle, this->m_timerStartDelay, this->m_timerInterval);
 			}
 		}
 	}
@@ -3954,7 +4048,8 @@ bool ws2812::AllocateBuffers()
 	// start byte + RGBW for each LED
 	m_bufferSize = 1 + 4 * m_ledNo;
 
-	m_outputBuffer.resize(m_bufferSize);
+	m_outputBuffer0.resize(m_bufferSize);
+	m_outputBuffer1.resize(m_bufferSize);
 	m_imageBuffer.resize(m_ledNo);
 	m_persistenceBuffer.resize(m_ledNo);
 	m_counterBuffer.resize(m_ledNo);
@@ -3977,7 +4072,8 @@ bool ws2812::AllocateBuffers()
 
 void ws2812::FreeBuffers()
 {
-	m_outputBuffer.resize(0);
+	m_outputBuffer0.resize(0);
+	m_outputBuffer1.resize(0);
 	m_imageBuffer.resize(0);
 	m_persistenceBuffer.resize(0);
 	m_counterBuffer.resize(0);
@@ -3987,7 +4083,9 @@ void ws2812::FreeBuffers()
 
 void ws2812::ClearOutputBuffer(void)
 {
-	for (auto &i : m_outputBuffer)
+	for (auto &i : m_outputBuffer0)
+		i = 0;
+	for (auto &i : m_outputBuffer1)
 		i = 0;
 }
 
@@ -4231,28 +4329,44 @@ unsigned int GetBrightnessLimited(unsigned int brightness)
 	return brightness;
 }
 
+void ws2812::GetStatistics(uint64_t & errCnt, uint64_t & busyCnt, uint64_t & okCnt)
+{
+	errCnt = m_comErrorCnt;
+	busyCnt = m_comBusyCnt;
+	okCnt = m_comOkCnt;
+}
+
+bool GetStatistics(uint64_t & errCnt, uint64_t & busyCnt, uint64_t & okCnt)
+{
+	if (ws2812_global) {
+		ws2812_global->GetStatistics(errCnt, busyCnt, okCnt);
+		return true;
+	}
+	return false;
+}
+
 
 ws2812::ws2812()
 {
 	unsigned int tmp;
 
-	m_hComm = INVALID_HANDLE_VALUE;
-	m_hTimer = INVALID_HANDLE_VALUE;
+	//m_comHandle = INVALID_HANDLE_VALUE;
+	//m_timerHandle = INVALID_HANDLE_VALUE;
 
-	m_ledNo = 0;
-	m_bufferSize = 0;
-	m_outputSize = 0;
+	//m_ledNo = 0;
+	//m_bufferSize = 0;
+	//m_outputSize = 0;
 
-	m_timerStarted = false;
-	m_timerActive = false;
-	m_initDone = false;
+	//m_timerStarted = false;
+	//m_timerActive = false;
+	//m_initDone = false;
 
-	//	if (visStream == nullptr) {
-			// ask the global visualisation manager to create a stream for us
-	static_api_ptr_t<visualisation_manager>()->create_stream(visStream, visualisation_manager::KStreamFlagNewFFT);
-	//	}
-		// I probably should test this
-	if (visStream != nullptr) {
+//	if (visStream == nullptr) {
+		// ask the global visualisation manager to create a stream for us
+		static_api_ptr_t<visualisation_manager>()->create_stream(visStream, visualisation_manager::KStreamFlagNewFFT);
+//	}
+	// I probably should test this
+	if (visStream.is_valid()) {
 		// mono is preferred, unless you want to use two displays ;-)
 		visStream->set_channel_mode(visualisation_stream_v2::channel_mode_mono);
 
@@ -4341,107 +4455,6 @@ ws2812::ws2812()
 		}
 	}
 }
-
-#if 0
-ws2812::ws2812(unsigned int rows, unsigned int cols, unsigned int port, ws2812_baudrate baudrate, unsigned int interval, ws2812_style style)
-{
-	m_hComm = INVALID_HANDLE_VALUE;
-	m_hTimer = INVALID_HANDLE_VALUE;
-
-	m_ledNo = 0;
-	m_bufferSize = 0;
-	m_outputSize = 0;
-
-	m_timerStarted = false;
-	m_timerActive = false;
-	m_initDone = false;
-
-	//	if (visStream == nullptr) {
-			// ask the global visualisation manager to create a stream for us
-	static_api_ptr_t<visualisation_manager>()->create_stream(visStream, visualisation_manager::KStreamFlagNewFFT);
-	//	}
-		// I probably should test this
-	if (visStream != nullptr) {
-		// mono is preferred, unless you want to use two displays ;-)
-		visStream->set_channel_mode(visualisation_stream_v2::channel_mode_mono);
-
-		// read configuration values
-		if (rows >= rows_min && rows <= rows_max)
-			this->m_rows = rows;
-		else
-			this->m_rows = rows_def;
-
-		if (cols >= columns_min && cols <= columns_max)
-			this->m_columns = cols;
-		else
-			this->m_columns = columns_def;
-
-		// allocate output buffer
-		m_initDone = AllocateBuffers();
-
-		if (port >= port_min && port < port_max)
-			this->m_comPort = port;
-		else
-			this->m_comPort = port_def;
-
-		//if (baudrate < ws2812_baudrate_no)
-		this->m_comBaudrate = baudrate;
-		//else
-		//	this->m_comBaudrate = ws2812_baudrate_115200;
-
-		if (interval >= timerInterval_min && interval <= timerInterval_max)
-			this->m_timerInterval = interval;
-		else
-			this->m_timerInterval = timerInterval_def;
-
-		this->m_brightness = brightness_def;
-
-		if (m_initDone) {
-			const char *colors = NULL;
-
-			//if (style >= 0 && style < ws2812_line_style_no)
-			//	style = ws2812_style::spectrum_simple;
-
-			SetStyle(style);
-
-			m_logFrequency = true;
-			m_logAmplitude = true;
-			m_peakValues = true;
-
-			m_ledMode = GetLedMode(0, 0);
-			SetLedColors(ws2812_led_colors::eGRB);
-
-			InitIndexLut();
-
-			m_timerStartDelay = 500;
-
-			// fast FFT
-			m_fftSize = 8 * 1024;
-
-			// oscilloscope display time
-			m_audioLength = 10 * 1e-3;
-
-			// init color tab
-			switch (m_lineStyle)
-			{
-			case ws2812_style::spectrum_simple:			colors = GetCfgSpectrumColors();		break;
-			case ws2812_style::spectrum_green_red_bars:	colors = GetCfgSpectrumBarColors();		break;
-			case ws2812_style::spectrum_fire_lines:		colors = GetCfgSpectrumFireColors();	break;
-			case ws2812_style::spectrogram_horizontal:	colors = GetCfgSpectrogramColors();		break;
-			case ws2812_style::spectrogram_vertical:	colors = GetCfgSpectrogramColors();		break;
-			case ws2812_style::oscilloscope_yt:			colors = GetCfgOscilloscopeColors();	break;
-			case ws2812_style::oscilloscope_xy:			colors = GetCfgOscilloscopeColors();	break;
-			case ws2812_style::oscillogram_horizontal:	colors = GetCfgOscilloscopeColors();	break;
-			case ws2812_style::oscillogram_vertical:	colors = GetCfgOscilloscopeColors();	break;
-			}
-			InitColorTab(colors);
-
-			InitAmplitudeMinMax();
-			InitFrequencyMinMax();
-		}
-	}
-}
-#endif
 
 ws2812::~ws2812()
 {

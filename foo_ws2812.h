@@ -31,7 +31,9 @@
  */
 
 #include <cstdint>
+#include <cstdbool>
 #include <vector>
+
 
 #define CALC_TAB_ELEMENTS(_TAB_)	(sizeof(_TAB_)/sizeof(_TAB_[0]))
 
@@ -184,6 +186,8 @@ public:
 	bool InitColorTab(const unsigned int *initTab, unsigned int tabElements);
 	bool InitColorTab(const char *pattern);
 
+	void GetStatistics(uint64_t & errCnt, uint64_t & busyCnt, uint64_t & okCnt);
+
 private:
 	BOOL OpenPort(LPCWSTR gszPort, unsigned int port);
 	BOOL ClosePort();
@@ -224,8 +228,8 @@ private:
 	void ClipColors(unsigned int &r, unsigned int &g, unsigned int &b);
 	void ClipColors(unsigned int &r, unsigned int &g, unsigned int &b, unsigned int &w);
 	void GetColorIndexes(unsigned int & r, unsigned int & g, unsigned int & b, unsigned int & w, unsigned int & no);
-	void ImageToBuffer(unsigned int offset, unsigned int count, unsigned int bufferSize);
-	void LedTestToBuffer(unsigned int offset, unsigned int count, unsigned int bufferSize);
+	unsigned int ImageToBuffer(unsigned int offset, unsigned int count, std::vector<unsigned char>& dst);
+	unsigned int LedTestToBuffer(unsigned int offset, unsigned int count, std::vector<unsigned char>& dst);
 	void ImageScrollLeft(void);
 	void ImageScrollRight(void);
 	void ImageScrollUp(void);
@@ -237,6 +241,8 @@ private:
 	void OutputOscilloscopeYt(const audio_sample *psample, unsigned int samples, unsigned int samplerate, unsigned int channels, audio_sample peak);
 	void OutputOscilloscopeXy(const audio_sample * psample, unsigned int samples, unsigned int samplerate, unsigned int channels, audio_sample peak);
 	void OutputOscillogram(const audio_sample *psample, unsigned int samples, unsigned int samplerate, unsigned int channels, audio_sample peak);
+
+	std::vector<unsigned char>& GetOutputBuffer();
 
 	void OutputImage();
 	void OutputTest();
@@ -316,16 +322,25 @@ private:
 	volatile bool			m_timerStarted{ false };
 	volatile bool			m_timerActive{ false };
 
-	HANDLE					m_hComm{ INVALID_HANDLE_VALUE };
-	HANDLE					m_hTimer{ INVALID_HANDLE_VALUE };
-	DWORD					m_commErr{ 0 };
+	HANDLE					m_timerHandle{ INVALID_HANDLE_VALUE };	// timer handle
+
+	HANDLE					m_comHandle{ INVALID_HANDLE_VALUE };	// COM port handle
+	OVERLAPPED				m_comWriteOvlp = { NULL };				// COM port write overlapped structure
+	DWORD					m_comError{ 0 };						// COM port errors
+	DWORD					m_comWriteTimeout{ 1000 };				// wait time for transfer completion (ms)
+
+	uint64_t				m_comErrorCnt{ 0 };						// statistics
+	uint64_t				m_comBusyCnt{ 0 };						// statistics
+	uint64_t				m_comOkCnt{ 0 };						// statistics
 
 	unsigned int			m_comPort{ 0 };
 	enum ws2812_baudrate	m_comBaudrate { ws2812_baudrate::e115200 };
 
 	unsigned int				m_bufferSize{ 0 };		// 1 + m_ledNo * 4
 	unsigned int				m_outputSize{ 0 };		// 1 + m_ledNo * (4 if m_ledColors == rgbw, 3 otherwise)
-	std::vector<unsigned char>	m_outputBuffer;			// data to be sent to the arduino
+	volatile unsigned int		m_outputBufferActive{ 0 };	// dual output buffer switch
+	std::vector<unsigned char>	m_outputBuffer0;		// data to be sent to the Arduino
+	std::vector<unsigned char>	m_outputBuffer1;		// data to be sent to the Arduino
 	std::vector<unsigned char>	m_ledSof;				// Start of Frame values
 	std::vector<unsigned int>	m_imageBuffer;			// image (xRGB)
 	std::vector<unsigned int>	m_persistenceBuffer;	// image persistence (xRGB)
@@ -399,6 +414,7 @@ unsigned int GetColumnsLimited(unsigned int columns);
 unsigned int GetIntervalLimited(unsigned int interval);
 unsigned int GetBrightnessLimited(unsigned int brightness);
 
+bool GetStatistics(uint64_t &errCnt, uint64_t &busyCnt, uint64_t &okCnt);
 
 // control_dialog.cpp
 void RunWS2812ControlDialog();
