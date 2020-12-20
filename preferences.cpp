@@ -633,30 +633,45 @@ void CWS2812Preferences::OnChanged() {
 
 void CWS2812Preferences::UpdateMatrixInfo(void)
 {
-	UINT	rows, cols, ledNo, brightness;
-	double	time, current;
+	UINT	rows, cols, ledNo, colors;
+	double	timePerLed, ledCurrent;
+	double	totalTime, totalCurrent;
 	WCHAR	text[100];
 
 	// get matrix configuration
-	rows = GetDlgItemInt(IDC_MATRIX_ROWS, NULL, FALSE);
-	cols = GetDlgItemInt(IDC_MATRIX_COLS, NULL, FALSE);
-	brightness = GetDlgItemInt(IDC_BRIGHTNESS, NULL, FALSE);
+	rows = cfg_matrixRows;
+	cols = cfg_matrixCols;
+	colors = cfg_ledColors;
 
 	// count of LEDs
 	ledNo = rows * cols;
 
-	// led transfer time: reset plus 1.25us per led
-	time = 50 + ceil((double)ledNo * 1.25);
-
-	// maximum power consumption (max 60mA per LED)
-	double ledCurrent = 3 * 0.020;
-
-	if (cfg_ledColors >= static_cast<unsigned int>(ws2812_led_colors::eGRBW))
+	switch (static_cast<ws2812_led_colors>(colors))
+	{
+	case ws2812_led_colors::eGRB:
+	case ws2812_led_colors::eBRG:
+	case ws2812_led_colors::eRGB:
+		ledCurrent = 3 * 0.020;
+		timePerLed = 1.25;
+		break;
+	case ws2812_led_colors::eGRBW:
+	case ws2812_led_colors::eRGBW:
 		ledCurrent = 4 * 0.020;
+		timePerLed = 1.67;
+		break;
+	case ws2812_led_colors::eNo:
+		ledCurrent = 0;
+		timePerLed = 0;
+		break;
+	}
 
-	current = ledCurrent * (double)ledNo * ((double)ws2812::brightness_max / 100);
+	// led transfer time: reset plus 1.25us per led (RGB)
+	totalTime = 50 + ceil(ledNo * timePerLed);
 
-	_stprintf_s(text, L"%u LEDs: %.2f A; %.0f us", ledNo, current, time);
+	// maximum power consumption
+	totalCurrent = ledCurrent * (double)ledNo * ((double)ws2812::brightness_max / 100);
+
+	_sntprintf_s(text, sizeof(text), L"%u LEDs: %.1f A; %.0f us", ledNo, totalCurrent, totalTime);
 	SetDlgItemText(IDC_MATRIX_INFO, text);
 }
 

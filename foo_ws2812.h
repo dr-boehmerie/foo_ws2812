@@ -249,11 +249,11 @@ private:
 
 public:
 	static const unsigned int	rows_min = 1;
-	static const unsigned int	rows_max = 300;
+	static const unsigned int	rows_max = 300;	// allow a whole strip as a single column
 	static const unsigned int	rows_def = 8;
 
 	static const unsigned int	columns_min = 1;
-	static const unsigned int	columns_max = 300;
+	static const unsigned int	columns_max = 300;	// allow a whole strip as a single row
 	static const unsigned int	columns_def = 8;
 
 	static const unsigned int	port_min = 1;
@@ -268,11 +268,11 @@ public:
 	static const unsigned int	led_pwm_limit_max = 255;	// LED PWM value
 	static const unsigned int	led_pwm_limit_def = 250;	// LED PWM value
 
-	static const unsigned int	sof_def = 1;				// Start of frame
+	static const unsigned int	sof_def = 1;				// Start of frame (Glediator)
 
-	static const unsigned int	timerInterval_min = 50;		// ms
+	static const unsigned int	timerInterval_min = 50;		// ms (TODO: less than 50 leads to output lag!)
 	static const unsigned int	timerInterval_max = 500;	// ms
-	static const unsigned int	timerInterval_def = 330;	// ms
+	static const unsigned int	timerInterval_def = 100;	// ms
 
 	static const int			frequency_min = 10;			// Hz
 	static const int			frequency_max = 22050;		// Hz
