@@ -71,22 +71,23 @@ enum class ws2812_style
 
 enum class ws2812_start_led
 {
-	top_left = 0,
-	top_right,
-	bottom_left,
-	bottom_right,
+	top_left = 0,	// first LED in the top left corner of the matrix, first row runs from left to right
+	top_right,		// first LED in the top right corner of the matrix, first row runs from right to left
+	bottom_left,	// first LED in the bottom left corner of the matrix, first row runs from left to right
+	bottom_right,	// first LED in the bottom right corner of the matrix, first row runs from right to left
 
 	eNo
 };
 
 enum class ws2812_led_direction
 {
-	common = 0,
-	alternating,
+	common = 0,		// all LED chains run in the same direction (e.g. from left to right)
+	alternating,	// directions of LED chains change from one row to the next (e.g. matrix starts with left to right, next is right to left, next left to right...)
 
 	eNo
 };
 
+// combination of the above two enumerations
 enum class ws2812_led_mode
 {
 	top_left_common = 0,
@@ -134,8 +135,6 @@ class ws2812
 public:
 	ws2812();
 	~ws2812();
-
-	//ws2812(unsigned int rows, unsigned int cols, unsigned int port, ws2812_baudrate baudrate, unsigned int interval, ws2812_style style);
 
 	bool ConfigMatrix(int rows, int cols, unsigned int start_led, unsigned int led_dir, unsigned int led_colors);
 	bool SetComPort(unsigned int port);
@@ -342,14 +341,14 @@ private:
 	std::vector<unsigned char>	m_outputBuffer0;		// data to be sent to the Arduino
 	std::vector<unsigned char>	m_outputBuffer1;		// data to be sent to the Arduino
 	std::vector<unsigned char>	m_ledSof;				// Start of Frame values
-	std::vector<unsigned int>	m_imageBuffer;			// image (xRGB)
-	std::vector<unsigned int>	m_persistenceBuffer;	// image persistence (xRGB)
+	std::vector<unsigned int>	m_imageBuffer;			// image (WRGB)
+	std::vector<unsigned int>	m_persistenceBuffer;	// image persistence (WRGB)
 	std::vector<unsigned int>	m_counterBuffer;		// pixel hit count in oscilloscope styles
 
 	std::vector<unsigned int>	m_indexLut;				// led index table (depends on start led and directions)
 
 	const unsigned int			m_colorNo{ 1000 };
-	std::vector<unsigned int>	m_colorTab;				// xRGB
+	std::vector<unsigned int>	m_colorTab;				// WRGB
 
 	unsigned int			m_testColor{ 0 };			// WRGB
 

@@ -35,6 +35,13 @@
 //#include "Windowsx.h"
 //#include "afxcmn.h"
 
+#include <libPPUI/win32_utility.h>
+#include <libPPUI/win32_op.h> // WIN32_OP()
+#include <libPPUI/wtl-pp.h> // CCheckBox
+#include <helpers/atl-misc.h> // ui_element_impl
+
+#include <helpers/WindowPositionUtils.h>
+
 #include "foo_ws2812.h"
 
 

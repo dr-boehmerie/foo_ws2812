@@ -1,5 +1,10 @@
 #include "stdafx.h"
 
+//#include <libPPUI/win32_utility.h>
+#include <libPPUI/win32_op.h> // WIN32_OP()
+//#include <libPPUI/wtl-pp.h> // CCheckBox
+//#include <helpers/atl-misc.h> // ui_element_impl
+#include <helpers/BumpableElem.h>
 
 class CWS2812ElemWindow : public ui_element_instance, public CWindowImpl<CWS2812ElemWindow>, private play_callback_impl_base {
 public:
