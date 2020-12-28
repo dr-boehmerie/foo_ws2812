@@ -34,15 +34,97 @@
 #include <cstdbool>
 #include <vector>
 
-namespace {
-	// Anonymous namespace : standard practice in fb2k components
-	// Nothing outside should have any reason to see these symbols, and we don't want funny results if another cpp has similarly named classes.
-	// service_factory at the bottom takes care of publishing our class.
 
 #define WS2812_COMPONENT_NAME			"WS2812 Output"
 #define WS2812_COMPONENT_VERSION_STR	"0.19"
 #define WS2812_COMPONENT_DESCRIPTION	"Plugin to control WS2812 LED stripes"
 
+
+enum class ws2812_style
+{
+	spectrum_simple = 0,		// simple white bars
+	spectrum_green_red_bars,	// bars from green to red, each row a seperate color
+	spectrum_fire_lines,		// bars from green to red, peak color applied to the whole bar
+
+	spectrogram_horizontal,		// spectrogram, moving horizontally
+	spectrogram_vertical,		// spectrogram, moving vertically
+
+	oscilloscope_yt,			// oscilloscope, single colored, yt-mode
+	oscilloscope_xy,			// oscilloscope, single colored, xy-mode
+
+	oscillogram_horizontal,		// oscillogram, moving horizontally
+	oscillogram_vertical,		// oscillogram, moving vertically
+
+	led_test,					// all leds the same color, user values rgbw
+
+	eNo
+};
+
+enum class ws2812_start_led
+{
+	top_left = 0,	// first LED in the top left corner of the matrix, first row runs from left to right
+	top_right,		// first LED in the top right corner of the matrix, first row runs from right to left
+	bottom_left,	// first LED in the bottom left corner of the matrix, first row runs from left to right
+	bottom_right,	// first LED in the bottom right corner of the matrix, first row runs from right to left
+
+	eNo
+};
+
+enum class ws2812_led_direction
+{
+	common = 0,		// all LED chains run in the same direction (e.g. from left to right)
+	alternating,	// directions of LED chains change from one row to the next (e.g. matrix starts with left to right, next is right to left, next left to right...)
+
+	eNo
+};
+
+// combination of the above two enumerations
+enum class ws2812_led_mode
+{
+	top_left_common = 0,
+	top_left_alternating,
+	top_right_common,
+	top_right_alternating,
+	bottom_left_common,
+	bottom_left_alternating,
+	bottom_right_common,
+	bottom_right_alternating,
+
+	eNo
+};
+
+enum class ws2812_led_colors
+{
+	eGRB,		// WS2812 default
+	eBRG,		// Renkforce (TM1829)
+	eRGB,
+	eGRBW,		// SK6812GRBW
+	eRGBW,		// SK6812RGBW
+
+	eNo
+};
+
+enum class ws2812_baudrate
+{
+	e9600,
+	e14400,
+	e19200,
+	e38400,
+	e56000,
+	e57600,
+	e115200,
+	e128000,
+	e250000,
+	e256000,
+	e500000,
+
+	eNo
+};
+
+namespace {
+	// Anonymous namespace : standard practice in fb2k components
+	// Nothing outside should have any reason to see these symbols, and we don't want funny results if another cpp has similarly named classes.
+	// service_factory at the bottom takes care of publishing our class.
 
 #define CALC_TAB_ELEMENTS(_TAB_)	(sizeof(_TAB_)/sizeof(_TAB_[0]))
 
@@ -57,87 +139,6 @@ namespace {
 #define SET_COLOR_G(_RGB_,_G_)		((_RGB_) & 0xFFFF00FF) | (((_G_) & 0xFF) << 8)
 #define SET_COLOR_B(_RGB_,_B_)		((_RGB_) & 0xFFFFFF00) | (((_B_) & 0xFF) << 0)
 #define SET_COLOR_W(_WRGB_,_W_)		((_WRGB_) & 0x00FFFFFF) | (((_W_) & 0xFF) << 24)
-
-	enum class ws2812_style
-	{
-		spectrum_simple = 0,		// simple white bars
-		spectrum_green_red_bars,	// bars from green to red, each row a seperate color
-		spectrum_fire_lines,		// bars from green to red, peak color applied to the whole bar
-
-		spectrogram_horizontal,		// spectrogram, moving horizontally
-		spectrogram_vertical,		// spectrogram, moving vertically
-
-		oscilloscope_yt,			// oscilloscope, single colored, yt-mode
-		oscilloscope_xy,			// oscilloscope, single colored, xy-mode
-
-		oscillogram_horizontal,		// oscillogram, moving horizontally
-		oscillogram_vertical,		// oscillogram, moving vertically
-
-		led_test,					// all leds the same color, user values rgbw
-
-		eNo
-	};
-
-	enum class ws2812_start_led
-	{
-		top_left = 0,	// first LED in the top left corner of the matrix, first row runs from left to right
-		top_right,		// first LED in the top right corner of the matrix, first row runs from right to left
-		bottom_left,	// first LED in the bottom left corner of the matrix, first row runs from left to right
-		bottom_right,	// first LED in the bottom right corner of the matrix, first row runs from right to left
-
-		eNo
-	};
-
-	enum class ws2812_led_direction
-	{
-		common = 0,		// all LED chains run in the same direction (e.g. from left to right)
-		alternating,	// directions of LED chains change from one row to the next (e.g. matrix starts with left to right, next is right to left, next left to right...)
-
-		eNo
-	};
-
-	// combination of the above two enumerations
-	enum class ws2812_led_mode
-	{
-		top_left_common = 0,
-		top_left_alternating,
-		top_right_common,
-		top_right_alternating,
-		bottom_left_common,
-		bottom_left_alternating,
-		bottom_right_common,
-		bottom_right_alternating,
-
-		eNo
-	};
-
-	enum class ws2812_led_colors
-	{
-		eGRB,		// WS2812 default
-		eBRG,		// Renkforce (TM1829)
-		eRGB,
-		eGRBW,		// SK6812GRBW
-		eRGBW,		// SK6812RGBW
-
-		eNo
-	};
-
-	enum class ws2812_baudrate
-	{
-		e9600,
-		e14400,
-		e19200,
-		e38400,
-		e56000,
-		e57600,
-		e115200,
-		e128000,
-		e250000,
-		e256000,
-		e500000,
-
-		eNo
-	};
 
 	class ws2812
 	{

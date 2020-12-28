@@ -630,6 +630,8 @@ namespace {
 		LRESULT			r;
 		WCHAR			text[100];
 
+		uSetWindowText(*this, WS2812_COMPONENT_NAME " V" WS2812_COMPONENT_VERSION_STR);
+
 		style = 0;
 		GetLineStyle(style);
 		switch (style)

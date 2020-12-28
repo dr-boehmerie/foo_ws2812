@@ -494,7 +494,6 @@ void CWS2812Preferences::apply() {
 	}
 
 	r = SendDlgItemMessage(IDC_LINE_STYLE, CB_GETCURSEL, 0, 0);
-//	r = ComboBox_GetCurSel(IDC_LINE_STYLE);
 	for (UINT n = 0; n < CALC_TAB_ELEMENTS(cfg_lineStyleId); n++) {
 		if (r == cfg_lineStyleId[n]) {
 			changed |= (cfg_lineStyle != n);
