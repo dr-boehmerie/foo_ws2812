@@ -35,6 +35,11 @@
 #include <vector>
 
 
+#define WS2812_COMPONENT_NAME			"WS2812 Output"
+#define WS2812_COMPONENT_VERSION_STR	"0.19"
+#define WS2812_COMPONENT_DESCRIPTION	"Plugin to control WS2812 LED stripes"
+
+
 #define CALC_TAB_ELEMENTS(_TAB_)	(sizeof(_TAB_)/sizeof(_TAB_[0]))
 
 //#define MAKE_COLOR(_R_,_G_,_B_)		((((_R_) & 0xFF) << 16) | (((_G_) & 0xFF) << 8) | ((_B_) & 0xFF))
