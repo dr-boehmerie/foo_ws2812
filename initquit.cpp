@@ -37,16 +37,16 @@
 
 #include "foo_ws2812.h"
 
-
 class ws2812_initquit : public initquit {
 public:
 	void on_init() {
-		console::print("WS2812 Output: on_init()");
+		console::print(WS2812_COMPONENT_NAME ": on_init()");
 
 		InitOutput();
 	}
+
 	void on_quit() {
-		console::print("WS2812 Output: on_quit()");
+		console::print(WS2812_COMPONENT_NAME ": on_quit()");
 
 		DeinitOutput();
 	}

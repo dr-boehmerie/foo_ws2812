@@ -110,7 +110,7 @@ public:
 	}
 	void get_name(t_uint32 p_index, pfc::string_base & p_out) {
 		switch (p_index) {
-		case cmd_show_control: p_out = "WS2812 Output"; break;
+		case cmd_show_control: p_out = WS2812_COMPONENT_NAME; break;
 		default: uBugCheck(); // should never happen unless somebody called us with invalid parameters - bail
 		}
 	}
